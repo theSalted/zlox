@@ -8,10 +8,10 @@ pub fn main() !void {
     const allocator = dba.allocator();
 
     var chunk: Chunk = undefined;
-    chunk.initChunk(allocator);
-    defer _ = chunk.freeChunk();
+    chunk.init(allocator);
+    defer chunk.free();
 
-    chunk.writeChunk(Chunk.OpCode.op_return);
+    chunk.write(Chunk.OpCode.op_return);
 
     debug.disassembleChunk(&chunk, "test chunk");
 }
