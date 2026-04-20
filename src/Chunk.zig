@@ -5,6 +5,8 @@ pub const OpCode = enum(u8) {
     op_return,
 };
 
+// Chunk
+
 count: usize,
 capacity: usize,
 code: ?[*]u8,
@@ -19,7 +21,14 @@ pub fn initChunk(chunk: *Chunk, allocator: std.mem.Allocator) void {
     chunk.allocator = allocator;
 }
 
-pub fn writeChunk(chunk: *Chunk, byte: u8) void {
+/// `value` accepts either `OpCode` or `u8`
+pub fn writeChunk(chunk: *Chunk, value: anytype) void {
+    const byte: u8 = switch (@TypeOf(value)) {
+        OpCode => @intFromEnum(value),
+        u8 => value,
+        else => @compileError("writeChunk: expected OpCode or u8"),
+    };
+
     if (chunk.capacity < chunk.count + 1) {
         const old_capacity = chunk.capacity;
         chunk.capacity = growCapacity(old_capacity);
