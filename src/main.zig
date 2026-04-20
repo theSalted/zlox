@@ -1,4 +1,6 @@
 const std = @import("std");
-const zlox = @import("zlox");
+const Chunk = @import("chunk.zig");
 
-pub fn main() !void {}
+pub fn main() !void {
+    std.debug.print("hello from zlox\n", .{});
+}
