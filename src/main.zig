@@ -1,6 +1,11 @@
 const std = @import("std");
-const Chunk = @import("chunk.zig");
+const Chunk = @import("Chunk.zig");
 
 pub fn main() !void {
-    std.debug.print("hello from zlox\n", .{});
+    var dba: std.heap.DebugAllocator(.{}) = .init;
+    defer _ = dba.deinit();
+    const allocator = dba.allocator();
+
+    var chunk: Chunk = undefined;
+    Chunk.initChunk(&chunk, allocator);
 }
