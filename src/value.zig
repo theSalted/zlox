@@ -1,6 +1,8 @@
 const std = @import("std");
 const mem = @import("memory.zig");
 
+const print = std.debug.print;
+
 pub const Value = f64;
 
 pub const ValueArray = struct {
@@ -32,3 +34,7 @@ pub const ValueArray = struct {
         init(array, array.allocator);
     }
 };
+
+pub fn printValue(value: Value) void {
+    print("{d}", .{value});
+}
