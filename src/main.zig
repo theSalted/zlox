@@ -16,9 +16,15 @@ pub fn main() !void {
     chunk.init(allocator);
     defer chunk.free();
 
-    const constant = chunk.addConstant(1.2);
+    var constant = chunk.addConstant(1.2);
     chunk.write(Chunk.OpCode.op_constant, 123);
     chunk.write(constant, 123);
+
+    constant = chunk.addConstant(3.4);
+    chunk.write(Chunk.OpCode.op_constant, 123);
+    chunk.write(constant, 123);
+
+    chunk.write(Chunk.OpCode.op_divide, 123);
     chunk.write(Chunk.OpCode.op_negate, 123);
 
     chunk.write(Chunk.OpCode.op_return, 123);

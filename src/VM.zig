@@ -64,6 +64,18 @@ pub fn run(vm: *VM) InterpretResult {
                 const constant: Value = readConstant(vm);
                 vm.push(constant);
             },
+            .op_add => {
+                vm.binaryOp('+');
+            },
+            .op_subtract => {
+                vm.binaryOp('-');
+            },
+            .op_multiply => {
+                vm.binaryOp('*');
+            },
+            .op_divide => {
+                vm.binaryOp('/');
+            },
             .op_negate => {
                 vm.push(-vm.pop());
             },
@@ -86,6 +98,19 @@ fn readBytes(vm: *VM) u8 {
     const b = vm.ip[0];
     vm.ip += 1;
     return b;
+}
+
+fn binaryOp(vm: *VM, comptime op: u8) void {
+    const b = vm.pop();
+    const a = vm.pop();
+
+    vm.push(switch (op) {
+        '+' => a + b,
+        '-' => a - b,
+        '*' => a * b,
+        '/' => a / b,
+        else => @compileError("binaryOp: unknown op"),
+    });
 }
 
 fn readConstant(vm: *VM) Value {
