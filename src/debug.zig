@@ -28,6 +28,7 @@ pub fn disassembleInstruction(chunk: *const Chunk, offset: usize) usize {
 
     switch (op) {
         .op_constant => return constantInstruction("OP_CONSTANT", chunk, offset),
+        .op_negate => return simpleInstruction("OP_NEGATE", offset),
         .op_return => return simpleInstruction("OP_RETURN", offset),
     }
 }

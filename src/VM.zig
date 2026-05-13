@@ -64,6 +64,9 @@ pub fn run(vm: *VM) InterpretResult {
                 const constant: Value = readConstant(vm);
                 vm.push(constant);
             },
+            .op_negate => {
+                vm.push(-vm.pop());
+            },
             .op_return => {
                 val.printValue(vm.pop());
                 print("\n", .{});

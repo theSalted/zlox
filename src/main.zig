@@ -19,6 +19,7 @@ pub fn main() !void {
     const constant = chunk.addConstant(1.2);
     chunk.write(Chunk.OpCode.op_constant, 123);
     chunk.write(constant, 123);
+    chunk.write(Chunk.OpCode.op_negate, 123);
 
     chunk.write(Chunk.OpCode.op_return, 123);
 
