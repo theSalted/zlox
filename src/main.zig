@@ -3,32 +3,47 @@ const VM = @import("VM.zig");
 const Chunk = @import("Chunk.zig");
 const debug = @import("debug.zig");
 
-pub fn main() !void {
-    var dba: std.heap.DebugAllocator(.{}) = .init;
-    defer _ = dba.deinit();
-    const allocator = dba.allocator();
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    const args = try init.minimal.args.toSlice(init.arena.allocator());
 
-    var vm: VM = undefined;
-    vm.init();
-    defer vm.free();
-
-    var chunk: Chunk = undefined;
-    chunk.init(allocator);
-    defer chunk.free();
-
-    var constant = chunk.addConstant(1.2);
-    chunk.write(Chunk.OpCode.op_constant, 123);
-    chunk.write(constant, 123);
-
-    constant = chunk.addConstant(3.4);
-    chunk.write(Chunk.OpCode.op_constant, 123);
-    chunk.write(constant, 123);
-
-    chunk.write(Chunk.OpCode.op_divide, 123);
-    chunk.write(Chunk.OpCode.op_negate, 123);
-
-    chunk.write(Chunk.OpCode.op_return, 123);
-
-    debug.disassembleChunk(&chunk, "test chunk");
-    _ = vm.interpret(&chunk);
+    if (args.len == 1) {
+        try repl(io);
+    } else if (args.len == 2) {
+        // try runFile(allocator, args[1]);
+    } else {
+        std.debug.print("Usage: zlox [path]\n", .{});
+        std.process.exit(1);
+    }
 }
+
+fn repl(io: std.Io) !void {
+    var line_buf: [1024]u8 = undefined;
+    var stdin_reader = std.Io.File.stdin().reader(io, &line_buf);
+    const stdin = &stdin_reader.interface;
+
+    var stdout_writer = std.Io.File.stdout().writer(io, &.{});
+    const stdout = &stdout_writer.interface;
+
+    while (true) {
+        try stdout.writeAll("> ");
+
+        const line = stdin.takeDelimiterExclusive('\n') catch |err| switch (err) {
+            error.EndOfStream => {
+                try stdout.writeAll("\n");
+                return;
+            },
+            error.StreamTooLong => {
+                try stdout.writeAll("Line too long\n");
+                stdin.toss(line_buf.len);
+                continue;
+            },
+            else => |e| return e,
+        };
+
+        // try interpret(line);
+        _ = line;
+    }
+}
+
+// fn runFile()
