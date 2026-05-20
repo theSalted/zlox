@@ -2,6 +2,7 @@ const std = @import("std");
 const val = @import("value.zig");
 const debug = @import("debug.zig");
 const common = @import("common.zig");
+const compiler = @import("compiler.zig");
 
 const Value = val.Value;
 const Chunk = @import("Chunk.zig");
@@ -90,8 +91,8 @@ pub fn run(vm: *VM) InterpretResult {
 
 pub fn interpret(vm: *VM, source: []const u8) InterpretResult {
     _ = vm;
-    _ = source;
-    // compile(source);
+
+    compiler.compile(source);
     return .interpret_ok;
 }
 
