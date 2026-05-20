@@ -45,14 +45,14 @@ pub const TokenType = enum {
     eof,
 };
 
-pub const Token = struct { type: TokenType, start: [*]const u8, length: usize, line: i32 };
+pub const Token = struct { type: TokenType, start: [*]const u8, length: usize, line: u32 };
 
 const Scanner = @This();
 
 source: []const u8,
 start: usize,
 current: usize,
-line: i32,
+line: u32,
 
 pub fn init(scanner: *Scanner, source: []const u8) void {
     scanner.source = source;
