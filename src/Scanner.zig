@@ -60,10 +60,33 @@ pub fn init(scanner: *Scanner, source: []const u8) void {
 }
 
 pub fn scanToken(scanner: *Scanner) Token {
-    return .{
-        .type = .eof,
-        .start = scanner.current.ptr,
-        .length = 0,
+    scanner.start = scanner.current;
+
+    if (scanner.isAtEnd()) {
+        return scanner.makeToken(.eof);
+    }
+
+    return scanner.errorToken("Unexpected character.");
+}
+
+fn makeToken(scanner: *Scanner, token_type: TokenType) Token {
+    return Token{
+        .type = token_type,
+        .start = scanner.start.ptr,
+        .length = scanner.start.len - scanner.current.len,
         .line = scanner.line,
     };
+}
+
+fn errorToken(scanner: *Scanner, message: []const u8) Token {
+    return Token{
+        .type = .@"error",
+        .start = message.ptr,
+        .length = message.len,
+        .line = scanner.line,
+    };
+}
+
+fn isAtEnd(scanner: *Scanner) bool {
+    return scanner.current.len == 0;
 }
