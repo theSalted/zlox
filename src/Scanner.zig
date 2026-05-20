@@ -62,6 +62,8 @@ pub fn init(scanner: *Scanner, source: []const u8) void {
 }
 
 pub fn scanToken(scanner: *Scanner) Token {
+    scanner.skipWhitespace();
+
     scanner.start = scanner.current;
 
     if (scanner.isAtEnd()) {
@@ -86,8 +88,11 @@ pub fn scanToken(scanner: *Scanner) Token {
         '=' => return scanner.makeToken(if (scanner.match('=')) .equal_equal else .equal),
         '<' => return scanner.makeToken(if (scanner.match('=')) .less_equal else .less),
         '>' => return scanner.makeToken(if (scanner.match('=')) .greater_equal else .greater),
-        else => return scanner.errorToken("Unexpected character."),
+
+        else => {},
     }
+
+    return scanner.errorToken("Unexpected character.");
 }
 
 fn advance(scanner: *Scanner) u8 {
@@ -101,6 +106,15 @@ fn match(scanner: *Scanner, expected: u8) bool {
     if (scanner.source[scanner.current] != expected) return false;
     scanner.current += 1;
     return true;
+}
+
+fn peek(scanner: *Scanner) u8 {
+    return scanner.source[scanner.current];
+}
+
+fn peekNext(scanner: *Scanner) u8 {
+    if (scanner.isAtEnd()) return 0;
+    return scanner.source[scanner.current + 1];
 }
 
 fn makeToken(scanner: *Scanner, token_type: TokenType) Token {
@@ -119,6 +133,36 @@ fn errorToken(scanner: *Scanner, message: []const u8) Token {
         .length = message.len,
         .line = scanner.line,
     };
+}
+
+fn skipWhitespace(scanner: *Scanner) void {
+    while (!scanner.isAtEnd()) {
+        const c = scanner.source[scanner.current];
+        switch (c) {
+            ' ', '\r' => {},
+            '\t' => {
+                _ = scanner.advance();
+                break;
+            },
+            '\n' => {
+                scanner.line += 1;
+                _ = scanner.advance();
+                break;
+            },
+            '/' => {
+                if (scanner.peekNext() == '/') {
+                    while (!scanner.isAtEnd() and scanner.peek() != '\n') {
+                        _ = scanner.advance();
+                    }
+                } else {
+                    return;
+                }
+                break;
+            },
+            else => return,
+        }
+        scanner.current += 1;
+    }
 }
 
 fn isAtEnd(scanner: *Scanner) bool {
