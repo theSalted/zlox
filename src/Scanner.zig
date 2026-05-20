@@ -66,7 +66,46 @@ pub fn scanToken(scanner: *Scanner) Token {
         return scanner.makeToken(.eof);
     }
 
+    const c: u8 = scanner.advance();
+
+    switch (c) {
+        '(' => return scanner.makeToken(.left_paren),
+        ')' => return scanner.makeToken(.right_paren),
+        '{' => return scanner.makeToken(.left_brace),
+        '}' => return scanner.makeToken(.right_brace),
+        ';' => return scanner.makeToken(.semicolon),
+        ',' => return scanner.makeToken(.comma),
+        '.' => return scanner.makeToken(.dot),
+        '-' => return scanner.makeToken(.minus),
+        '+' => return scanner.makeToken(.plus),
+        '/' => return scanner.makeToken(.slash),
+        '*' => return scanner.makeToken(.star),
+        '!' => {
+            return scanner.makeToken(if (scanner.match('=')) .bang_equal else .bang);
+        },
+        '=' => {
+            return scanner.makeToken(if (scanner.match('=')) .equal_equal else .equal);
+        },
+        '<' => {
+            return scanner.makeToken(if (scanner.match('=')) .less_equal else .less);
+        },
+        '>' => {
+            return scanner.makeToken(if (scanner.match('=')) .greater_equal else .greater);
+        },
+    }
     return scanner.errorToken("Unexpected character.");
+}
+
+fn advance(scanner: *Scanner) u8 {
+    scanner.current += 1;
+    return scanner.current[-1];
+}
+
+fn match(scanner: *Scanner, expected: u8) bool {
+    if (scanner.isAtEnd()) return false;
+    if (scanner.current[-1] != expected) return false;
+    scanner.current += 1;
+    return true;
 }
 
 fn makeToken(scanner: *Scanner, token_type: TokenType) Token {
