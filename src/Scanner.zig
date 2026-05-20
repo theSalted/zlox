@@ -49,13 +49,15 @@ pub const Token = struct { type: TokenType, start: [*]const u8, length: usize, l
 
 const Scanner = @This();
 
-start: []const u8,
-current: []const u8,
+source: []const u8,
+start: usize,
+current: usize,
 line: i32,
 
 pub fn init(scanner: *Scanner, source: []const u8) void {
-    scanner.start = source;
-    scanner.current = source;
+    scanner.source = source;
+    scanner.start = 0;
+    scanner.current = 0;
     scanner.line = 1;
 }
 
@@ -80,30 +82,23 @@ pub fn scanToken(scanner: *Scanner) Token {
         '+' => return scanner.makeToken(.plus),
         '/' => return scanner.makeToken(.slash),
         '*' => return scanner.makeToken(.star),
-        '!' => {
-            return scanner.makeToken(if (scanner.match('=')) .bang_equal else .bang);
-        },
-        '=' => {
-            return scanner.makeToken(if (scanner.match('=')) .equal_equal else .equal);
-        },
-        '<' => {
-            return scanner.makeToken(if (scanner.match('=')) .less_equal else .less);
-        },
-        '>' => {
-            return scanner.makeToken(if (scanner.match('=')) .greater_equal else .greater);
-        },
+        '!' => return scanner.makeToken(if (scanner.match('=')) .bang_equal else .bang),
+        '=' => return scanner.makeToken(if (scanner.match('=')) .equal_equal else .equal),
+        '<' => return scanner.makeToken(if (scanner.match('=')) .less_equal else .less),
+        '>' => return scanner.makeToken(if (scanner.match('=')) .greater_equal else .greater),
+        else => return scanner.errorToken("Unexpected character."),
     }
-    return scanner.errorToken("Unexpected character.");
 }
 
 fn advance(scanner: *Scanner) u8 {
+    const c = scanner.source[scanner.current];
     scanner.current += 1;
-    return scanner.current[-1];
+    return c;
 }
 
 fn match(scanner: *Scanner, expected: u8) bool {
     if (scanner.isAtEnd()) return false;
-    if (scanner.current[-1] != expected) return false;
+    if (scanner.source[scanner.current] != expected) return false;
     scanner.current += 1;
     return true;
 }
@@ -111,8 +106,8 @@ fn match(scanner: *Scanner, expected: u8) bool {
 fn makeToken(scanner: *Scanner, token_type: TokenType) Token {
     return Token{
         .type = token_type,
-        .start = scanner.start.ptr,
-        .length = scanner.start.len - scanner.current.len,
+        .start = scanner.source.ptr + scanner.start,
+        .length = scanner.current - scanner.start,
         .line = scanner.line,
     };
 }
@@ -127,5 +122,5 @@ fn errorToken(scanner: *Scanner, message: []const u8) Token {
 }
 
 fn isAtEnd(scanner: *Scanner) bool {
-    return scanner.current.len == 0;
+    return scanner.current >= scanner.source.len;
 }
