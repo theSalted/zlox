@@ -72,6 +72,9 @@ pub fn scanToken(scanner: *Scanner) Token {
 
     const c: u8 = scanner.advance();
 
+    if (isAlpha(c)) return scanner.identifier();
+    if (isDigit(c)) return scanner.number();
+
     switch (c) {
         '(' => return scanner.makeToken(.left_paren),
         ')' => return scanner.makeToken(.right_paren),
@@ -88,6 +91,7 @@ pub fn scanToken(scanner: *Scanner) Token {
         '=' => return scanner.makeToken(if (scanner.match('=')) .equal_equal else .equal),
         '<' => return scanner.makeToken(if (scanner.match('=')) .less_equal else .less),
         '>' => return scanner.makeToken(if (scanner.match('=')) .greater_equal else .greater),
+        '"' => return scanner.string(),
 
         else => {},
     }
@@ -109,12 +113,41 @@ fn match(scanner: *Scanner, expected: u8) bool {
 }
 
 fn peek(scanner: *Scanner) u8 {
+    if (scanner.isAtEnd()) return 0;
     return scanner.source[scanner.current];
 }
 
 fn peekNext(scanner: *Scanner) u8 {
     if (scanner.current + 1 >= scanner.source.len) return 0;
     return scanner.source[scanner.current + 1];
+}
+
+fn identifier(scanner: *Scanner) Token {
+    while (isAlpha(scanner.peek()) or isDigit(scanner.peek())) _ = scanner.advance();
+    return scanner.makeToken(.identifier);
+}
+
+fn string(scanner: *Scanner) Token {
+    while (scanner.peek() != '"' and !scanner.isAtEnd()) {
+        if (scanner.peek() == '\n') scanner.line += 1;
+        _ = scanner.advance();
+    }
+
+    if (scanner.isAtEnd()) return scanner.errorToken("Unterminated string.");
+
+    _ = scanner.advance();
+    return makeToken(scanner, .string);
+}
+
+fn number(scanner: *Scanner) Token {
+    while (isDigit(scanner.peek())) _ = scanner.advance();
+
+    if (scanner.peek() == '.' and isDigit(scanner.peekNext())) {
+        _ = scanner.advance();
+        while (isDigit(scanner.peek())) _ = scanner.advance();
+    }
+
+    return makeToken(scanner, .number);
 }
 
 fn makeToken(scanner: *Scanner, token_type: TokenType) Token {
@@ -160,4 +193,12 @@ fn skipWhitespace(scanner: *Scanner) void {
 
 fn isAtEnd(scanner: *Scanner) bool {
     return scanner.current >= scanner.source.len;
+}
+
+fn isAlpha(c: u8) bool {
+    return (c >= 'a' and c <= 'z') or (c >= 'A' and c <= 'Z') or c == '_';
+}
+
+fn isDigit(c: u8) bool {
+    return c >= '0' and c <= '9';
 }

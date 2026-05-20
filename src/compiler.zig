@@ -17,7 +17,7 @@ pub fn compile(source: []const u8) void {
             print("{d:>4} ", .{token.line});
             line = token.line;
         } else {
-            print("    | ", .{});
+            print("   | ", .{});
         }
 
         print("{d:<2} '{s}'\n", .{ @intFromEnum(token.type), token.start[0..token.length] });
