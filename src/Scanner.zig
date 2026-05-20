@@ -113,7 +113,7 @@ fn peek(scanner: *Scanner) u8 {
 }
 
 fn peekNext(scanner: *Scanner) u8 {
-    if (scanner.isAtEnd()) return 0;
+    if (scanner.current + 1 >= scanner.source.len) return 0;
     return scanner.source[scanner.current + 1];
 }
 
@@ -139,15 +139,10 @@ fn skipWhitespace(scanner: *Scanner) void {
     while (!scanner.isAtEnd()) {
         const c = scanner.source[scanner.current];
         switch (c) {
-            ' ', '\r' => {},
-            '\t' => {
-                _ = scanner.advance();
-                break;
-            },
+            ' ', '\r', '\t' => _ = scanner.advance(),
             '\n' => {
                 scanner.line += 1;
                 _ = scanner.advance();
-                break;
             },
             '/' => {
                 if (scanner.peekNext() == '/') {
@@ -157,11 +152,9 @@ fn skipWhitespace(scanner: *Scanner) void {
                 } else {
                     return;
                 }
-                break;
             },
             else => return,
         }
-        scanner.current += 1;
     }
 }
 
