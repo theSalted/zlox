@@ -10,7 +10,7 @@ const print = std.debug.print;
 
 const VM = @This();
 
-const InterpretResult = enum(u8) { interpret_ok, interpret_compile_error, interpret_runtime_error };
+pub const InterpretResult = enum(u8) { interpret_ok, interpret_compile_error, interpret_runtime_error };
 
 const stack_max: usize = 256;
 
@@ -88,10 +88,11 @@ pub fn run(vm: *VM) InterpretResult {
     }
 }
 
-pub fn interpret(vm: *VM, chunk: *Chunk) InterpretResult {
-    vm.chunk = chunk;
-    vm.ip = vm.chunk.code.?;
-    return vm.run();
+pub fn interpret(vm: *VM, source: []const u8) InterpretResult {
+    _ = vm;
+    _ = source;
+    // compile(source);
+    return .interpret_ok;
 }
 
 fn readBytes(vm: *VM) u8 {
