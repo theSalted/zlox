@@ -1,3 +1,5 @@
+const std = @import("std");
+
 pub const TokenType = enum {
     // single character tokens
     left_paren,
@@ -124,7 +126,53 @@ fn peekNext(scanner: *Scanner) u8 {
 
 fn identifier(scanner: *Scanner) Token {
     while (isAlpha(scanner.peek()) or isDigit(scanner.peek())) _ = scanner.advance();
-    return scanner.makeToken(.identifier);
+    return scanner.makeToken(scanner.identifierType());
+}
+
+fn identifierType(scanner: *Scanner) TokenType {
+    switch (scanner.source[scanner.start]) {
+        'a' => return scanner.checkWord(1, 2, "nd", .@"and"),
+        'c' => return scanner.checkWord(1, 4, "lass", .class),
+        'e' => return scanner.checkWord(1, 3, "lse", .@"else"),
+        'f' => {
+            if (scanner.current - scanner.start > 1) {
+                switch (scanner.source[scanner.start + 1]) {
+                    'a' => return scanner.checkWord(2, 3, "lse", .false),
+                    'o' => return scanner.checkWord(2, 1, "r", .@"for"),
+                    'u' => return scanner.checkWord(2, 1, "n", .fun),
+                    else => {},
+                }
+            }
+        },
+        'i' => return scanner.checkWord(1, 1, "f", .@"if"),
+        'n' => return scanner.checkWord(1, 2, "il", .nil),
+        'o' => return scanner.checkWord(1, 1, "r", .@"or"),
+        'p' => return scanner.checkWord(1, 4, "rint", .print),
+        'r' => return scanner.checkWord(1, 5, "eturn", .@"return"),
+        's' => return scanner.checkWord(1, 4, "uper", .super),
+        't' => {
+            if (scanner.current - scanner.start > 1) {
+                switch (scanner.source[scanner.start + 1]) {
+                    'h' => return scanner.checkWord(2, 2, "is", .this),
+                    'r' => return scanner.checkWord(2, 2, "ue", .true),
+                    else => {},
+                }
+            }
+        },
+        'v' => return scanner.checkWord(1, 2, "ar", .@"var"),
+        'w' => return scanner.checkWord(1, 4, "hile", .@"while"),
+        else => {},
+    }
+    return .identifier;
+}
+
+fn checkWord(scanner: *Scanner, start: usize, length: usize, rest: []const u8, token_type: TokenType) TokenType {
+    if (scanner.current - scanner.start == start + length and
+        std.mem.eql(u8, scanner.source[scanner.start + start .. scanner.start + start + length], rest))
+    {
+        return token_type;
+    }
+    return .identifier;
 }
 
 fn string(scanner: *Scanner) Token {
@@ -171,6 +219,7 @@ fn errorToken(scanner: *Scanner, message: []const u8) Token {
 fn skipWhitespace(scanner: *Scanner) void {
     while (!scanner.isAtEnd()) {
         const c = scanner.source[scanner.current];
+
         switch (c) {
             ' ', '\r', '\t' => _ = scanner.advance(),
             '\n' => {
