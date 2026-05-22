@@ -8,7 +8,7 @@ pub fn main(init: std.process.Init) !void {
     const args = try init.minimal.args.toSlice(init.arena.allocator());
 
     var vm: VM = undefined;
-    vm.init();
+    vm.init(init.gpa);
     defer vm.free();
 
     if (args.len == 1) {

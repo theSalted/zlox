@@ -21,12 +21,14 @@ chunk: *Chunk,
 ip: [*]u8,
 stack: [stack_max]Value,
 stack_top: [*]Value,
+allocator: std.mem.Allocator,
 
 fn resetStack(vm: *VM) void {
     vm.stack_top = &vm.stack;
 }
 
-pub fn init(vm: *VM) void {
+pub fn init(vm: *VM, allocator: std.mem.Allocator) void {
+    vm.allocator = allocator;
     vm.resetStack();
 }
 
@@ -90,10 +92,20 @@ pub fn run(vm: *VM) InterpretResult {
 }
 
 pub fn interpret(vm: *VM, source: []const u8) InterpretResult {
-    _ = vm;
+    var chunk: Chunk = undefined;
+    chunk.init(vm.allocator);
+    defer chunk.free();
 
-    compiler.compile(source);
-    return .interpret_ok;
+    if (!compiler.compile(source, &chunk)) {
+        return .interpret_compile_error;
+    }
+
+    vm.chunk = &chunk;
+    vm.ip = vm.chunk.code.?;
+
+    const result = vm.run();
+
+    return result;
 }
 
 fn readBytes(vm: *VM) u8 {
