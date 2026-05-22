@@ -7,6 +7,20 @@ const Scanner = @import("Scanner.zig");
 const Token = Scanner.Token;
 const TokenType = Scanner.TokenType;
 
+const Precedence = enum {
+    none,
+    assignment,
+    @"or",
+    @"and",
+    equality,
+    comparison,
+    term,
+    factor,
+    unary,
+    call,
+    primary,
+};
+
 const Parser = struct {
     scanner: *Scanner,
     previous: Token,
@@ -74,9 +88,7 @@ const Compiler = struct {
     }
 
     fn expression(compiler: *Compiler) void {
-        // COMEBACK
-
-        _ = compiler;
+        compiler.parsePrecedence(.assignment);
     }
 
     fn emitByte(compiler: *Compiler, byte: u8) void {
@@ -122,6 +134,23 @@ const Compiler = struct {
         const lexeme = compiler.parser.previous.start[0..compiler.parser.previous.length];
         const value = std.fmt.parseFloat(f64, lexeme) catch unreachable;
         compiler.emitConstant(value);
+    }
+
+    fn unary(compiler: *Compiler) void {
+        const opreatorType = compiler.parser.previous.type;
+
+        compiler.parsePrecedence(.unary);
+
+        switch (opreatorType) {
+            .minus => compiler.emitByte(@intFromEnum(Chunk.OpCode.op_negate)),
+            else => return,
+        }
+    }
+
+    fn parsePrecedence(compiler: *Compiler, precedence: Precedence) void {
+        // todo
+        _ = compiler;
+        _ = precedence;
     }
 };
 
