@@ -113,6 +113,11 @@ const Compiler = struct {
         compiler.emitReturn();
     }
 
+    fn grouping(compiler: *Compiler) void {
+        compiler.expression();
+        compiler.parser.consume(.right_paren, "Expexct ')' after expression.");
+    }
+
     fn number(compiler: *Compiler) void {
         const lexeme = compiler.parser.previous.start[0..compiler.parser.previous.length];
         const value = std.fmt.parseFloat(f64, lexeme) catch unreachable;

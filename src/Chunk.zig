@@ -69,5 +69,5 @@ pub fn free(chunk: *Chunk) void {
 
 pub fn addConstant(chunk: *Chunk, value: Value) u8 {
     chunk.constants.write(value);
-    return @intCast(chunk.constants.count - 1);
+    return chunk.constants.count - 1;
 }
