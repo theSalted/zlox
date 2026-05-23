@@ -125,6 +125,14 @@ const Compiler = struct {
         compiler.emitReturn();
     }
 
+    fn binary(compiler: *Compiler) void {
+        const operator_type = compiler.parser.previous.type;
+
+        const rule = getRule(operator_type);
+
+        compiler.parsePrecedence(rule.precedence + 1);
+    }
+
     fn grouping(compiler: *Compiler) void {
         compiler.expression();
         compiler.parser.consume(.right_paren, "Expexct ')' after expression.");
