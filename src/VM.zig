@@ -104,6 +104,8 @@ pub fn interpret(vm: *VM, source: []const u8) InterpretResult {
     vm.ip = vm.chunk.code.?;
 
     const result = vm.run();
+    vm.chunk = undefined;
+    vm.ip = undefined;
 
     return result;
 }

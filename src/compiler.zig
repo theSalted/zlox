@@ -21,15 +21,27 @@ const Precedence = enum {
     primary,
 };
 
+const ParseFn = *const fn (*Compiler) void;
+
+const ParseRule = struct {
+    prefix: ?ParseFn,
+    infix: ?ParseFn,
+    precedence: Precedence,
+};
+
 const Parser = struct {
     scanner: *Scanner,
     previous: Token,
     current: Token,
-    hadError: bool,
-    panicMode: bool,
+    had_error: bool,
+    panic_mode: bool,
 
     fn init(parser: *Parser, scanner: *Scanner) void {
         parser.scanner = scanner;
+        parser.previous = undefined;
+        parser.current = undefined;
+        parser.had_error = false;
+        parser.panic_mode = false;
     }
 
     fn advance(parser: *Parser) void {
@@ -61,8 +73,8 @@ const Parser = struct {
     }
 
     fn errorAt(parser: *Parser, token: Token, message: []const u8) void {
-        if (parser.panicMode) return;
-        parser.panicMode = true;
+        if (parser.panic_mode) return;
+        parser.panic_mode = true;
 
         print("[line {d}] Error", .{token.line});
 
@@ -74,17 +86,17 @@ const Parser = struct {
             print(" at '{s}'", .{token.start[0..token.length]});
         }
         print(": {s}\n", .{message});
-        parser.hadError = true;
+        parser.had_error = true;
     }
 };
 
 const Compiler = struct {
     parser: *Parser,
-    compilingChunk: *Chunk,
+    compiling_chunk: *Chunk,
 
     fn init(c: *Compiler, parser: *Parser, chunk: *Chunk) void {
         c.parser = parser;
-        c.compilingChunk = chunk;
+        c.compiling_chunk = chunk;
     }
 
     fn expression(compiler: *Compiler) void {
@@ -118,7 +130,7 @@ const Compiler = struct {
     }
 
     fn currentChunk(compiler: *Compiler) *Chunk {
-        return compiler.compilingChunk;
+        return compiler.compiling_chunk;
     }
 
     fn endCompiler(compiler: *Compiler) void {
@@ -130,12 +142,20 @@ const Compiler = struct {
 
         const rule = getRule(operator_type);
 
-        compiler.parsePrecedence(rule.precedence + 1);
+        compiler.parsePrecedence(@enumFromInt(@intFromEnum(rule.precedence) + 1));
+
+        switch (operator_type) {
+            .plus => compiler.emitByte(@intFromEnum(Chunk.OpCode.op_add)),
+            .minus => compiler.emitByte(@intFromEnum(Chunk.OpCode.op_subtract)),
+            .star => compiler.emitByte(@intFromEnum(Chunk.OpCode.op_multiply)),
+            .slash => compiler.emitByte(@intFromEnum(Chunk.OpCode.op_divide)),
+            else => return,
+        }
     }
 
     fn grouping(compiler: *Compiler) void {
         compiler.expression();
-        compiler.parser.consume(.right_paren, "Expexct ')' after expression.");
+        compiler.parser.consume(.right_paren, "Expect ')' after expression.");
     }
 
     fn number(compiler: *Compiler) void {
@@ -145,20 +165,79 @@ const Compiler = struct {
     }
 
     fn unary(compiler: *Compiler) void {
-        const opreatorType = compiler.parser.previous.type;
+        const operator_type = compiler.parser.previous.type;
 
         compiler.parsePrecedence(.unary);
 
-        switch (opreatorType) {
+        switch (operator_type) {
             .minus => compiler.emitByte(@intFromEnum(Chunk.OpCode.op_negate)),
             else => return,
         }
     }
 
+    fn getRule(token_type: TokenType) ParseRule {
+        return switch (token_type) {
+            .left_paren => .{ .prefix = grouping, .infix = null, .precedence = .none },
+            .right_paren => .{ .prefix = null, .infix = null, .precedence = .none },
+            .left_brace => .{ .prefix = null, .infix = null, .precedence = .none },
+            .right_brace => .{ .prefix = null, .infix = null, .precedence = .none },
+            .comma => .{ .prefix = null, .infix = null, .precedence = .none },
+            .dot => .{ .prefix = null, .infix = null, .precedence = .none },
+            .minus => .{ .prefix = unary, .infix = binary, .precedence = .term },
+            .plus => .{ .prefix = null, .infix = binary, .precedence = .term },
+            .semicolon => .{ .prefix = null, .infix = null, .precedence = .none },
+            .slash => .{ .prefix = null, .infix = binary, .precedence = .factor },
+            .star => .{ .prefix = null, .infix = binary, .precedence = .factor },
+            .bang => .{ .prefix = null, .infix = null, .precedence = .none },
+            .bang_equal => .{ .prefix = null, .infix = null, .precedence = .none },
+            .equal => .{ .prefix = null, .infix = null, .precedence = .none },
+            .equal_equal => .{ .prefix = null, .infix = null, .precedence = .none },
+            .greater => .{ .prefix = null, .infix = null, .precedence = .none },
+            .greater_equal => .{ .prefix = null, .infix = null, .precedence = .none },
+            .less => .{ .prefix = null, .infix = null, .precedence = .none },
+            .less_equal => .{ .prefix = null, .infix = null, .precedence = .none },
+            .identifier => .{ .prefix = null, .infix = null, .precedence = .none },
+            .string => .{ .prefix = null, .infix = null, .precedence = .none },
+            .number => .{ .prefix = number, .infix = null, .precedence = .none },
+            .@"and" => .{ .prefix = null, .infix = null, .precedence = .none },
+            .class => .{ .prefix = null, .infix = null, .precedence = .none },
+            .@"else" => .{ .prefix = null, .infix = null, .precedence = .none },
+            .false => .{ .prefix = null, .infix = null, .precedence = .none },
+            .@"for" => .{ .prefix = null, .infix = null, .precedence = .none },
+            .fun => .{ .prefix = null, .infix = null, .precedence = .none },
+            .@"if" => .{ .prefix = null, .infix = null, .precedence = .none },
+            .nil => .{ .prefix = null, .infix = null, .precedence = .none },
+            .@"or" => .{ .prefix = null, .infix = null, .precedence = .none },
+            .print => .{ .prefix = null, .infix = null, .precedence = .none },
+            .@"return" => .{ .prefix = null, .infix = null, .precedence = .none },
+            .super => .{ .prefix = null, .infix = null, .precedence = .none },
+            .this => .{ .prefix = null, .infix = null, .precedence = .none },
+            .true => .{ .prefix = null, .infix = null, .precedence = .none },
+            .@"var" => .{ .prefix = null, .infix = null, .precedence = .none },
+            .@"while" => .{ .prefix = null, .infix = null, .precedence = .none },
+            .@"error" => .{ .prefix = null, .infix = null, .precedence = .none },
+            .eof => .{ .prefix = null, .infix = null, .precedence = .none },
+        };
+    }
+
     fn parsePrecedence(compiler: *Compiler, precedence: Precedence) void {
         // todo
-        _ = compiler;
-        _ = precedence;
+        compiler.parser.advance();
+
+        const prefix_rule = getRule(compiler.parser.previous.type).prefix;
+
+        if (prefix_rule == null) {
+            compiler.parser.errorAtPrevious("Expect expression.");
+            return;
+        }
+
+        prefix_rule.?(compiler);
+
+        while (@intFromEnum(precedence) <= @intFromEnum(getRule(compiler.parser.current.type).precedence)) {
+            compiler.parser.advance();
+            const infix_rule = getRule(compiler.parser.previous.type).infix;
+            infix_rule.?(compiler);
+        }
     }
 };
 
@@ -168,8 +247,6 @@ pub fn compile(source: []const u8, chunk: *Chunk) bool {
 
     var parser: Parser = undefined;
     parser.init(&scanner);
-    parser.hadError = false;
-    parser.panicMode = false;
 
     var compiler: Compiler = undefined;
     compiler.init(&parser, chunk);
@@ -179,5 +256,5 @@ pub fn compile(source: []const u8, chunk: *Chunk) bool {
     parser.consume(.eof, "Expect end of expression.");
     compiler.endCompiler();
 
-    return !parser.hadError;
+    return !parser.had_error;
 }
