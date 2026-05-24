@@ -1,4 +1,6 @@
 const std = @import("std");
+const common = @import("common.zig");
+const debug = @import("debug.zig");
 const print = std.debug.print;
 const object = @import("object.zig");
 
@@ -192,6 +194,12 @@ const Compiler = struct {
 
     fn endCompiler(compiler: *Compiler) void {
         compiler.emitReturn();
+
+        if (common.debug_print_code) {
+            if (compiler.parser.had_error) {
+                debug.disassembleChunk(compiler.currentChunk(), "Error");
+            }
+        }
     }
 
     fn binary(compiler: *Compiler) void {
