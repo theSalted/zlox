@@ -81,6 +81,9 @@ pub fn run(vm: *VM) InterpretResult {
                 const constant: Value = readConstant(vm);
                 vm.push(constant);
             },
+            .op_nil => vm.push(.{ .val_nil = {} }),
+            .op_true => vm.push(.{ .val_bool = true }),
+            .op_false => vm.push(.{ .val_bool = false }),
             .op_add => {
                 const r = vm.binaryOp('+');
                 if (r != .interpret_ok) return r;

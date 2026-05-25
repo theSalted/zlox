@@ -154,6 +154,15 @@ const Compiler = struct {
         }
     }
 
+    fn literal(compiler: *Compiler) void {
+        switch (compiler.parser.previous.type) {
+            .false => compiler.emitByte(@intFromEnum(Chunk.OpCode.op_false)),
+            .nil => compiler.emitByte(@intFromEnum(Chunk.OpCode.op_nil)),
+            .true => compiler.emitByte(@intFromEnum(Chunk.OpCode.op_true)),
+            else => return,
+        }
+    }
+
     fn grouping(compiler: *Compiler) void {
         compiler.expression();
         compiler.parser.consume(.right_paren, "Expect ')' after expression.");
@@ -203,17 +212,17 @@ const Compiler = struct {
             .@"and" => .{ .prefix = null, .infix = null, .precedence = .none },
             .class => .{ .prefix = null, .infix = null, .precedence = .none },
             .@"else" => .{ .prefix = null, .infix = null, .precedence = .none },
-            .false => .{ .prefix = null, .infix = null, .precedence = .none },
+            .false => .{ .prefix = literal, .infix = null, .precedence = .none },
             .@"for" => .{ .prefix = null, .infix = null, .precedence = .none },
             .fun => .{ .prefix = null, .infix = null, .precedence = .none },
             .@"if" => .{ .prefix = null, .infix = null, .precedence = .none },
-            .nil => .{ .prefix = null, .infix = null, .precedence = .none },
+            .nil => .{ .prefix = literal, .infix = null, .precedence = .none },
             .@"or" => .{ .prefix = null, .infix = null, .precedence = .none },
             .print => .{ .prefix = null, .infix = null, .precedence = .none },
             .@"return" => .{ .prefix = null, .infix = null, .precedence = .none },
             .super => .{ .prefix = null, .infix = null, .precedence = .none },
             .this => .{ .prefix = null, .infix = null, .precedence = .none },
-            .true => .{ .prefix = null, .infix = null, .precedence = .none },
+            .true => .{ .prefix = literal, .infix = null, .precedence = .none },
             .@"var" => .{ .prefix = null, .infix = null, .precedence = .none },
             .@"while" => .{ .prefix = null, .infix = null, .precedence = .none },
             .@"error" => .{ .prefix = null, .infix = null, .precedence = .none },

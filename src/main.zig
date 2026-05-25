@@ -32,17 +32,18 @@ fn repl(io: std.Io, vm: *VM) !void {
     while (true) {
         try stdout.writeAll("> ");
 
-        const line = stdin.takeDelimiterExclusive('\n') catch |err| switch (err) {
-            error.EndOfStream => {
-                try stdout.writeAll("\n");
-                return;
-            },
+        const maybe_line = stdin.takeDelimiter('\n') catch |err| switch (err) {
             error.StreamTooLong => {
                 try stdout.writeAll("Line too long\n");
                 stdin.toss(line_buf.len);
                 continue;
             },
             else => |e| return e,
+        };
+
+        const line = maybe_line orelse {
+            try stdout.writeAll("\n");
+            return;
         };
 
         _ = vm.interpret(line);
