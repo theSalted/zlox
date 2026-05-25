@@ -6,6 +6,7 @@ const Scanner = @import("Scanner.zig");
 
 const Token = Scanner.Token;
 const TokenType = Scanner.TokenType;
+const Value = @import("value.zig").Value;
 
 const Precedence = enum {
     none,
@@ -116,7 +117,7 @@ const Compiler = struct {
         compiler.emitByte(@intFromEnum(Chunk.OpCode.op_return));
     }
 
-    fn makeConstant(compiler: *Compiler, value: f64) u8 {
+    fn makeConstant(compiler: *Compiler, value: Value) u8 {
         const constant = compiler.currentChunk().addConstant(value);
         if (constant > 255) {
             compiler.parser.errorAtPrevious("Too many constants in one chunk");
@@ -125,7 +126,7 @@ const Compiler = struct {
         return @intCast(constant);
     }
 
-    fn emitConstant(compiler: *Compiler, value: f64) void {
+    fn emitConstant(compiler: *Compiler, value: Value) void {
         compiler.emitBytes(@intFromEnum(Chunk.OpCode.op_constant), compiler.makeConstant(value));
     }
 
@@ -161,7 +162,7 @@ const Compiler = struct {
     fn number(compiler: *Compiler) void {
         const lexeme = compiler.parser.previous.start[0..compiler.parser.previous.length];
         const value = std.fmt.parseFloat(f64, lexeme) catch unreachable;
-        compiler.emitConstant(value);
+        compiler.emitConstant(.{ .val_number = value });
     }
 
     fn unary(compiler: *Compiler) void {

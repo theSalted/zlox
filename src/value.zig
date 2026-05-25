@@ -3,7 +3,11 @@ const mem = @import("memory.zig");
 
 const print = std.debug.print;
 
-pub const Value = f64;
+pub const Value = union(enum) {
+    val_bool: bool,
+    val_nil: void,
+    val_number: f64,
+};
 
 pub const ValueArray = struct {
     count: usize,
@@ -36,5 +40,9 @@ pub const ValueArray = struct {
 };
 
 pub fn printValue(value: Value) void {
-    print("{d}", .{value});
+    switch (value) {
+        .val_bool => |b| print("{}", .{b}),
+        .val_nil => print("nil", .{}),
+        .val_number => |n| print("{d}", .{n}),
+    }
 }

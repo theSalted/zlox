@@ -27,6 +27,16 @@ fn resetStack(vm: *VM) void {
     vm.stack_top = &vm.stack;
 }
 
+fn runtimeError(vm: *VM, comptime fmt: []const u8, args: anytype) void {
+    std.debug.print(fmt ++ "\n", args);
+
+    const instruction = @intFromPtr(vm.ip) - @intFromPtr(vm.chunk.code.?) - 1;
+    const line = vm.chunk.lines.?[instruction];
+    std.debug.print("[line {d}] in script\n", .{line});
+
+    vm.resetStack();
+}
+
 pub fn init(vm: *VM, allocator: std.mem.Allocator) void {
     vm.allocator = allocator;
     vm.resetStack();
@@ -44,6 +54,10 @@ pub fn push(vm: *VM, value: Value) void {
 pub fn pop(vm: *VM) Value {
     vm.stack_top -= 1;
     return vm.stack_top[0];
+}
+
+pub fn peek(vm: *VM, distance: usize) Value {
+    return (vm.stack_top - 1 - distance)[0];
 }
 
 pub fn run(vm: *VM) InterpretResult {
@@ -68,19 +82,27 @@ pub fn run(vm: *VM) InterpretResult {
                 vm.push(constant);
             },
             .op_add => {
-                vm.binaryOp('+');
+                const r = vm.binaryOp('+');
+                if (r != .interpret_ok) return r;
             },
             .op_subtract => {
-                vm.binaryOp('-');
+                const r = vm.binaryOp('-');
+                if (r != .interpret_ok) return r;
             },
             .op_multiply => {
-                vm.binaryOp('*');
+                const r = vm.binaryOp('*');
+                if (r != .interpret_ok) return r;
             },
             .op_divide => {
-                vm.binaryOp('/');
+                const r = vm.binaryOp('/');
+                if (r != .interpret_ok) return r;
             },
             .op_negate => {
-                vm.push(-vm.pop());
+                if (vm.peek(0) != .val_number) {
+                    vm.runtimeError("Operand must be a number.", .{});
+                    return .interpret_runtime_error;
+                }
+                vm.push(.{ .val_number = -vm.pop().val_number });
             },
             .op_return => {
                 val.printValue(vm.pop());
@@ -116,17 +138,24 @@ fn readBytes(vm: *VM) u8 {
     return b;
 }
 
-fn binaryOp(vm: *VM, comptime op: u8) void {
-    const b = vm.pop();
-    const a = vm.pop();
+fn binaryOp(vm: *VM, comptime op: u8) InterpretResult {
+    if (vm.peek(0) != .val_number or vm.peek(1) != .val_number) {
+        vm.runtimeError("Operands must be numbers.", .{});
+        return .interpret_runtime_error;
+    }
 
-    vm.push(switch (op) {
+    const b = vm.pop().val_number;
+    const a = vm.pop().val_number;
+
+    vm.push(.{ .val_number = switch (op) {
         '+' => a + b,
         '-' => a - b,
         '*' => a * b,
         '/' => a / b,
         else => @compileError("binaryOp: unknown op"),
-    });
+    } });
+
+    return .interpret_ok;
 }
 
 fn readConstant(vm: *VM) Value {
