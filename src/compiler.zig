@@ -146,6 +146,12 @@ const Compiler = struct {
         compiler.parsePrecedence(@enumFromInt(@intFromEnum(rule.precedence) + 1));
 
         switch (operator_type) {
+            .bang_equal => compiler.emitBytes(@intFromEnum(Chunk.OpCode.op_equal), @intFromEnum(Chunk.OpCode.op_not)),
+            .equal_equal => compiler.emitByte(@intFromEnum(Chunk.OpCode.op_equal)),
+            .greater => compiler.emitByte(@intFromEnum(Chunk.OpCode.op_greater)),
+            .greater_equal => compiler.emitBytes(@intFromEnum(Chunk.OpCode.op_less), @intFromEnum(Chunk.OpCode.op_not)),
+            .less => compiler.emitByte(@intFromEnum(Chunk.OpCode.op_less)),
+            .less_equal => compiler.emitBytes(@intFromEnum(Chunk.OpCode.op_greater), @intFromEnum(Chunk.OpCode.op_not)),
             .plus => compiler.emitByte(@intFromEnum(Chunk.OpCode.op_add)),
             .minus => compiler.emitByte(@intFromEnum(Chunk.OpCode.op_subtract)),
             .star => compiler.emitByte(@intFromEnum(Chunk.OpCode.op_multiply)),
@@ -180,6 +186,7 @@ const Compiler = struct {
         compiler.parsePrecedence(.unary);
 
         switch (operator_type) {
+            .bang => compiler.emitByte(@intFromEnum(Chunk.OpCode.op_not)),
             .minus => compiler.emitByte(@intFromEnum(Chunk.OpCode.op_negate)),
             else => return,
         }
@@ -198,14 +205,14 @@ const Compiler = struct {
             .semicolon => .{ .prefix = null, .infix = null, .precedence = .none },
             .slash => .{ .prefix = null, .infix = binary, .precedence = .factor },
             .star => .{ .prefix = null, .infix = binary, .precedence = .factor },
-            .bang => .{ .prefix = null, .infix = null, .precedence = .none },
-            .bang_equal => .{ .prefix = null, .infix = null, .precedence = .none },
+            .bang => .{ .prefix = unary, .infix = null, .precedence = .none },
+            .bang_equal => .{ .prefix = null, .infix = binary, .precedence = .equality },
             .equal => .{ .prefix = null, .infix = null, .precedence = .none },
-            .equal_equal => .{ .prefix = null, .infix = null, .precedence = .none },
-            .greater => .{ .prefix = null, .infix = null, .precedence = .none },
-            .greater_equal => .{ .prefix = null, .infix = null, .precedence = .none },
-            .less => .{ .prefix = null, .infix = null, .precedence = .none },
-            .less_equal => .{ .prefix = null, .infix = null, .precedence = .none },
+            .equal_equal => .{ .prefix = null, .infix = binary, .precedence = .equality },
+            .greater => .{ .prefix = null, .infix = binary, .precedence = .comparison },
+            .greater_equal => .{ .prefix = null, .infix = binary, .precedence = .comparison },
+            .less => .{ .prefix = null, .infix = binary, .precedence = .comparison },
+            .less_equal => .{ .prefix = null, .infix = binary, .precedence = .comparison },
             .identifier => .{ .prefix = null, .infix = null, .precedence = .none },
             .string => .{ .prefix = null, .infix = null, .precedence = .none },
             .number => .{ .prefix = number, .infix = null, .precedence = .none },

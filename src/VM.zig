@@ -60,6 +60,14 @@ pub fn peek(vm: *VM, distance: usize) Value {
     return (vm.stack_top - 1 - distance)[0];
 }
 
+pub fn isFalsy(value: Value) bool {
+    return switch (value) {
+        .val_nil => true,
+        .val_bool => |b| !b,
+        .val_number => false,
+    };
+}
+
 pub fn run(vm: *VM) InterpretResult {
     while (true) {
         if (common.debug_trace_execution) {
@@ -84,6 +92,29 @@ pub fn run(vm: *VM) InterpretResult {
             .op_nil => vm.push(.{ .val_nil = {} }),
             .op_true => vm.push(.{ .val_bool = true }),
             .op_false => vm.push(.{ .val_bool = false }),
+            .op_equal => {
+                const b = vm.pop();
+                const a = vm.pop();
+                vm.push(.{ .val_bool = val.valuesEqual(a, b) });
+            },
+            .op_greater => {
+                if (vm.peek(0) != .val_number or vm.peek(1) != .val_number) {
+                    vm.runtimeError("Operands must be numbers.", .{});
+                    return .interpret_runtime_error;
+                }
+                const b = vm.pop().val_number;
+                const a = vm.pop().val_number;
+                vm.push(.{ .val_bool = a > b });
+            },
+            .op_less => {
+                if (vm.peek(0) != .val_number or vm.peek(1) != .val_number) {
+                    vm.runtimeError("Operands must be numbers.", .{});
+                    return .interpret_runtime_error;
+                }
+                const b = vm.pop().val_number;
+                const a = vm.pop().val_number;
+                vm.push(.{ .val_bool = a < b });
+            },
             .op_add => {
                 const r = vm.binaryOp('+');
                 if (r != .interpret_ok) return r;
@@ -99,6 +130,9 @@ pub fn run(vm: *VM) InterpretResult {
             .op_divide => {
                 const r = vm.binaryOp('/');
                 if (r != .interpret_ok) return r;
+            },
+            .op_not => {
+                vm.push(.{ .val_bool = isFalsy(vm.pop()) });
             },
             .op_negate => {
                 if (vm.peek(0) != .val_number) {

@@ -39,6 +39,14 @@ pub const ValueArray = struct {
     }
 };
 
+pub fn valuesEqual(a: Value, b: Value) bool {
+    return switch (a) {
+        .val_bool => |av| b == .val_bool and av == b.val_bool,
+        .val_nil => b == .val_nil,
+        .val_number => |av| b == .val_number and av == b.val_number,
+    };
+}
+
 pub fn printValue(value: Value) void {
     switch (value) {
         .val_bool => |b| print("{}", .{b}),
