@@ -3,10 +3,15 @@ const mem = @import("memory.zig");
 
 const print = std.debug.print;
 
+pub const Object = struct {
+    type: ObjectType,
+};
+
 pub const Value = union(enum) {
     val_bool: bool,
     val_nil: void,
     val_number: f64,
+    val_object: *Object,
 };
 
 pub const ValueArray = struct {
