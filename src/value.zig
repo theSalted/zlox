@@ -1,10 +1,15 @@
 const std = @import("std");
 const mem = @import("memory.zig");
+const object = @import("object.zig");
 
 const print = std.debug.print;
 
 pub const Object = struct {
     type: ObjectType,
+};
+
+pub const ObjectType = enum {
+    string,
 };
 
 pub const Value = union(enum) {
@@ -49,6 +54,12 @@ pub fn valuesEqual(a: Value, b: Value) bool {
         .val_bool => |av| b == .val_bool and av == b.val_bool,
         .val_nil => b == .val_nil,
         .val_number => |av| b == .val_number and av == b.val_number,
+        .val_object => {
+            if (b != .val_object) return false;
+            const aString = object.asString(a);
+            const bString = object.asString(b);
+            return aString.len == bString.len and std.mem.eql(u8, aString.chars, bString.chars);
+        },
     };
 }
 
@@ -57,5 +68,6 @@ pub fn printValue(value: Value) void {
         .val_bool => |b| print("{}", .{b}),
         .val_nil => print("nil", .{}),
         .val_number => |n| print("{d}", .{n}),
+        .val_object => |obj| object.printObject(obj),
     }
 }

@@ -17,3 +17,7 @@ pub fn growArray(comptime T: type, allocator: std.mem.Allocator, ptr: ?[*]T, old
 pub fn freeArray(comptime T: type, allocator: std.mem.Allocator, ptr: ?[*]T, count: usize) void {
     if (ptr) |p| allocator.free(p[0..count]);
 }
+
+pub fn allocate(allocator: std.mem.Allocator, comptime T: type, count: usize) []T {
+    return allocator.alloc(T, count) catch @panic("out of memory");
+}

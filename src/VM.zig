@@ -3,6 +3,8 @@ const val = @import("value.zig");
 const debug = @import("debug.zig");
 const common = @import("common.zig");
 const compiler = @import("compiler.zig");
+const object = @import("object.zig");
+const memory = @import("memory.zig");
 
 const Value = val.Value;
 const Chunk = @import("Chunk.zig");
@@ -68,6 +70,19 @@ pub fn isFalsy(value: Value) bool {
     };
 }
 
+fn concatenate(vm: *VM) void {
+    const b = object.asString(vm.pop());
+    const a = object.asString(vm.pop());
+
+    const length = a.len + b.len;
+    const chars = memory.allocate(vm.allocator, u8, length);
+    @memcpy(chars[0..a.len], a.chars);
+    @memcpy(chars[a.len .. a.len + b.len], b.chars);
+
+    const result = object.takeString(vm.allocator, chars, length);
+    vm.push(.{ .val_object = &result.obj });
+}
+
 pub fn run(vm: *VM) InterpretResult {
     while (true) {
         if (common.debug_trace_execution) {
@@ -116,8 +131,16 @@ pub fn run(vm: *VM) InterpretResult {
                 vm.push(.{ .val_bool = a < b });
             },
             .op_add => {
-                const r = vm.binaryOp('+');
-                if (r != .interpret_ok) return r;
+                if (object.isString(vm.peek(0)) and object.isString(vm.peek(1))) {
+                    concatenate(vm);
+                } else if (vm.peek(0) == .val_number and vm.peek(1) == .val_number) {
+                    const b = vm.pop().val_number;
+                    const a = vm.pop().val_number;
+                    vm.push(.{ .val_number = a + b });
+                } else {
+                    vm.runtimeError("Operands must be two numbers or two strings.", .{});
+                    return .interpret_runtime_error;
+                }
             },
             .op_subtract => {
                 const r = vm.binaryOp('-');

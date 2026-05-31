@@ -1,5 +1,6 @@
 const std = @import("std");
 const print = std.debug.print;
+const object = @import("object.zig");
 
 const Chunk = @import("Chunk.zig");
 const Scanner = @import("Scanner.zig");
@@ -180,6 +181,11 @@ const Compiler = struct {
         compiler.emitConstant(.{ .val_number = value });
     }
 
+    fn string(compiler: *Compiler) void {
+        const parser = compiler.parser;
+        compiler.emitConstant(object.copyString(parser.previous.start + 1, parser.previous.length - 2));
+    }
+
     fn unary(compiler: *Compiler) void {
         const operator_type = compiler.parser.previous.type;
 
@@ -214,7 +220,7 @@ const Compiler = struct {
             .less => .{ .prefix = null, .infix = binary, .precedence = .comparison },
             .less_equal => .{ .prefix = null, .infix = binary, .precedence = .comparison },
             .identifier => .{ .prefix = null, .infix = null, .precedence = .none },
-            .string => .{ .prefix = null, .infix = null, .precedence = .none },
+            .string => .{ .prefix = string, .infix = null, .precedence = .none },
             .number => .{ .prefix = number, .infix = null, .precedence = .none },
             .@"and" => .{ .prefix = null, .infix = null, .precedence = .none },
             .class => .{ .prefix = null, .infix = null, .precedence = .none },
