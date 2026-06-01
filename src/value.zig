@@ -4,13 +4,7 @@ const object = @import("object.zig");
 
 const print = std.debug.print;
 
-pub const Object = struct {
-    type: ObjectType,
-};
-
-pub const ObjectType = enum {
-    string,
-};
+const Object = object.Object;
 
 pub const Value = union(enum) {
     val_bool: bool,
@@ -58,7 +52,7 @@ pub fn valuesEqual(a: Value, b: Value) bool {
             if (b != .val_object) return false;
             const aString = object.asString(a);
             const bString = object.asString(b);
-            return aString.len == bString.len and std.mem.eql(u8, aString.chars, bString.chars);
+            return aString.len == bString.len and std.mem.eql(u8, aString.chars[0..aString.len], bString.chars[0..bString.len]);
         },
     };
 }

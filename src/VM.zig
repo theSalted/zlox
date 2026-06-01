@@ -23,6 +23,7 @@ chunk: *Chunk,
 ip: [*]u8,
 stack: [stack_max]Value,
 stack_top: [*]Value,
+objects: ?*object.Object,
 allocator: std.mem.Allocator,
 
 fn resetStack(vm: *VM) void {
@@ -41,6 +42,7 @@ fn runtimeError(vm: *VM, comptime fmt: []const u8, args: anytype) void {
 
 pub fn init(vm: *VM, allocator: std.mem.Allocator) void {
     vm.allocator = allocator;
+    vm.objects = null;
     vm.resetStack();
 }
 
@@ -77,10 +79,10 @@ fn concatenate(vm: *VM) void {
 
     const length = a.len + b.len;
     const chars = memory.allocate(vm.allocator, u8, length);
-    @memcpy(chars[0..a.len], a.chars);
-    @memcpy(chars[a.len .. a.len + b.len], b.chars);
+    @memcpy(chars[0..a.len], a.chars[0..a.len]);
+    @memcpy(chars[a.len .. a.len + b.len], b.chars[0..b.len]);
 
-    const result = object.takeString(vm.allocator, chars, length);
+    const result = object.takeString(vm.allocator, chars.ptr, length);
     vm.push(.{ .val_object = &result.obj });
 }
 
