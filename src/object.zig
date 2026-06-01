@@ -18,7 +18,8 @@ pub inline fn isString(value: Value) bool {
 }
 
 pub inline fn asString(value: Value) *ObjectString {
-    return @fieldParentPtr("obj", value.val_object);
+    const addr = @intFromPtr(value.val_object) - @offsetOf(ObjectString, "obj");
+    return @ptrFromInt(addr);
 }
 
 pub inline fn asCString(value: Value) []const u8 {
@@ -46,7 +47,8 @@ pub fn takeString(allocator: std.mem.Allocator, chars: []const u8, length: usize
 pub fn printObject(obj: *Object) void {
     switch (obj.type) {
         .string => {
-            const string: *ObjectString = @fieldParentPtr("obj", obj);
+            const addr = @intFromPtr(obj) - @offsetOf(ObjectString, "obj");
+            const string: *ObjectString = @ptrFromInt(addr);
             print("{s}", .{string.chars});
         },
     }

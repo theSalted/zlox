@@ -95,8 +95,10 @@ const Parser = struct {
 const Compiler = struct {
     parser: *Parser,
     compiling_chunk: *Chunk,
+    allocator: std.mem.Allocator,
 
-    fn init(c: *Compiler, parser: *Parser, chunk: *Chunk) void {
+    fn init(c: *Compiler, allocator: std.mem.Allocator, parser: *Parser, chunk: *Chunk) void {
+        c.allocator = allocator;
         c.parser = parser;
         c.compiling_chunk = chunk;
     }
@@ -183,7 +185,8 @@ const Compiler = struct {
 
     fn string(compiler: *Compiler) void {
         const parser = compiler.parser;
-        compiler.emitConstant(object.copyString(parser.previous.start + 1, parser.previous.length - 2));
+        const str = object.copyString(compiler.allocator, parser.previous.start + 1, parser.previous.length - 2);
+        compiler.emitConstant(.{ .val_object = &str.obj });
     }
 
     fn unary(compiler: *Compiler) void {
@@ -264,7 +267,7 @@ const Compiler = struct {
     }
 };
 
-pub fn compile(source: []const u8, chunk: *Chunk) bool {
+pub fn compile(allocator: std.mem.Allocator, source: []const u8, chunk: *Chunk) bool {
     var scanner: Scanner = undefined;
     scanner.init(source);
 
@@ -272,7 +275,7 @@ pub fn compile(source: []const u8, chunk: *Chunk) bool {
     parser.init(&scanner);
 
     var compiler: Compiler = undefined;
-    compiler.init(&parser, chunk);
+    compiler.init(allocator, &parser, chunk);
 
     parser.advance();
     compiler.expression();

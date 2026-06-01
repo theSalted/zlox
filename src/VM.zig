@@ -67,6 +67,7 @@ pub fn isFalsy(value: Value) bool {
         .val_nil => true,
         .val_bool => |b| !b,
         .val_number => false,
+        .val_object => false,
     };
 }
 
@@ -178,7 +179,7 @@ pub fn interpret(vm: *VM, source: []const u8) InterpretResult {
     chunk.init(vm.allocator);
     defer chunk.free();
 
-    if (!compiler.compile(source, &chunk)) {
+    if (!compiler.compile(vm.allocator, source, &chunk)) {
         return .interpret_compile_error;
     }
 
