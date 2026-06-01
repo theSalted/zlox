@@ -11,7 +11,7 @@ const Chunk = @import("Chunk.zig");
 
 const print = std.debug.print;
 
-const VM = @This();
+pub const VM = @This();
 
 pub const InterpretResult = enum(u8) { interpret_ok, interpret_compile_error, interpret_runtime_error };
 
@@ -47,7 +47,7 @@ pub fn init(vm: *VM, allocator: std.mem.Allocator) void {
 }
 
 pub fn free(vm: *VM) void {
-    _ = vm;
+    memory.freeObjects(vm);
 }
 
 pub fn push(vm: *VM, value: Value) void {
@@ -82,7 +82,7 @@ fn concatenate(vm: *VM) void {
     @memcpy(chars[0..a.len], a.chars[0..a.len]);
     @memcpy(chars[a.len .. a.len + b.len], b.chars[0..b.len]);
 
-    const result = object.takeString(vm.allocator, chars.ptr, length);
+    const result = object.takeString(vm, chars.ptr, length);
     vm.push(.{ .val_object = &result.obj });
 }
 
@@ -181,7 +181,7 @@ pub fn interpret(vm: *VM, source: []const u8) InterpretResult {
     chunk.init(vm.allocator);
     defer chunk.free();
 
-    if (!compiler.compile(vm.allocator, source, &chunk)) {
+    if (!compiler.compile(vm, source, &chunk)) {
         return .interpret_compile_error;
     }
 

@@ -8,6 +8,7 @@ const Scanner = @import("Scanner.zig");
 const Token = Scanner.Token;
 const TokenType = Scanner.TokenType;
 const Value = @import("value.zig").Value;
+const VM = @import("VM.zig").VM;
 
 const Precedence = enum {
     none,
@@ -95,10 +96,10 @@ const Parser = struct {
 const Compiler = struct {
     parser: *Parser,
     compiling_chunk: *Chunk,
-    allocator: std.mem.Allocator,
+    vm: *VM,
 
-    fn init(c: *Compiler, allocator: std.mem.Allocator, parser: *Parser, chunk: *Chunk) void {
-        c.allocator = allocator;
+    fn init(c: *Compiler, vm: *VM, parser: *Parser, chunk: *Chunk) void {
+        c.vm = vm;
         c.parser = parser;
         c.compiling_chunk = chunk;
     }
@@ -185,7 +186,7 @@ const Compiler = struct {
 
     fn string(compiler: *Compiler) void {
         const parser = compiler.parser;
-        const str = object.copyString(compiler.allocator, parser.previous.start + 1, parser.previous.length - 2);
+        const str = object.copyString(compiler.vm, parser.previous.start + 1, parser.previous.length - 2);
         compiler.emitConstant(.{ .val_object = &str.obj });
     }
 
@@ -267,7 +268,7 @@ const Compiler = struct {
     }
 };
 
-pub fn compile(allocator: std.mem.Allocator, source: []const u8, chunk: *Chunk) bool {
+pub fn compile(vm: *VM, source: []const u8, chunk: *Chunk) bool {
     var scanner: Scanner = undefined;
     scanner.init(source);
 
@@ -275,7 +276,7 @@ pub fn compile(allocator: std.mem.Allocator, source: []const u8, chunk: *Chunk) 
     parser.init(&scanner);
 
     var compiler: Compiler = undefined;
-    compiler.init(allocator, &parser, chunk);
+    compiler.init(vm, &parser, chunk);
 
     parser.advance();
     compiler.expression();
