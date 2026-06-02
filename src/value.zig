@@ -48,12 +48,7 @@ pub fn valuesEqual(a: Value, b: Value) bool {
         .val_bool => |av| b == .val_bool and av == b.val_bool,
         .val_nil => b == .val_nil,
         .val_number => |av| b == .val_number and av == b.val_number,
-        .val_object => {
-            if (b != .val_object) return false;
-            const aString = object.asString(a);
-            const bString = object.asString(b);
-            return aString.len == bString.len and std.mem.eql(u8, aString.chars[0..aString.len], bString.chars[0..bString.len]);
-        },
+        .val_object => |val| b == .val_object and val == b.val_object,
     };
 }
 

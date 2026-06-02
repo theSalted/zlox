@@ -19,6 +19,7 @@ pub const ObjectString = extern struct {
     obj: Object,
     len: usize,
     chars: [*]const u8,
+    hash: u32,
 };
 
 pub inline fn isString(value: Value) bool {
@@ -40,21 +41,41 @@ fn allocateObject(vm: *VM, comptime T: type, object_type: ObjectType) *T {
     return ptr;
 }
 
-fn allocateString(vm: *VM, chars: [*]const u8, len: usize) *ObjectString {
+fn allocateString(vm: *VM, chars: [*]const u8, len: usize, hash: u32) *ObjectString {
     const string = allocateObject(vm, ObjectString, .string);
     string.len = len;
     string.chars = chars;
+    string.hash = hash;
+    _ = vm.strings.set(string, .val_nil);
     return string;
 }
 
 pub fn copyString(vm: *VM, chars: [*]const u8, length: usize) *ObjectString {
+    const hash = hashString(chars, length);
+    if (vm.strings.findString(chars, length, hash)) |interned| return interned;
+
     const heap = memory.allocate(vm.allocator, u8, length);
     @memcpy(heap, chars[0..length]);
-    return allocateString(vm, heap.ptr, length);
+    return allocateString(vm, heap.ptr, length, hash);
 }
 
 pub fn takeString(vm: *VM, chars: [*]const u8, length: usize) *ObjectString {
-    return allocateString(vm, chars, length);
+    const hash = hashString(chars, length);
+    if (vm.strings.findString(chars, length, hash)) |interned| {
+        memory.freeArray(u8, vm.allocator, chars, length);
+        return interned;
+    }
+
+    return allocateString(vm, chars, length, hash);
+}
+
+fn hashString(key: [*]const u8, length: usize) u32 {
+    var hash: u32 = 2166136261;
+    for (key[0..length]) |byte| {
+        hash ^= byte;
+        hash *%= 16777619;
+    }
+    return hash;
 }
 
 pub fn printObject(obj: *Object) void {

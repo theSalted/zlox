@@ -8,6 +8,7 @@ const memory = @import("memory.zig");
 
 const Value = val.Value;
 const Chunk = @import("Chunk.zig");
+const Table = @import("Table.zig").Table;
 
 const print = std.debug.print;
 
@@ -23,6 +24,7 @@ chunk: *Chunk,
 ip: [*]u8,
 stack: [stack_max]Value,
 stack_top: [*]Value,
+strings: Table,
 objects: ?*object.Object,
 allocator: std.mem.Allocator,
 
@@ -44,10 +46,12 @@ pub fn init(vm: *VM, allocator: std.mem.Allocator) void {
     vm.allocator = allocator;
     vm.objects = null;
     vm.resetStack();
+    vm.strings.init(allocator);
 }
 
 pub fn free(vm: *VM) void {
     memory.freeObjects(vm);
+    vm.strings.free();
 }
 
 pub fn push(vm: *VM, value: Value) void {
