@@ -67,6 +67,16 @@ const Parser = struct {
         parser.errorAtCurrent(message);
     }
 
+    fn check(parser: *Parser, token_type: TokenType) bool {
+        return parser.current.type == token_type;
+    }
+
+    fn match(parser: *Parser, token_type: TokenType) bool {
+        if (!parser.check(token_type)) return false;
+        parser.advance();
+        return true;
+    }
+
     fn errorAtCurrent(parser: *Parser, message: []const u8) void {
         parser.errorAt(parser.current, message);
     }
@@ -106,6 +116,22 @@ const Compiler = struct {
 
     fn expression(compiler: *Compiler) void {
         compiler.parsePrecedence(.assignment);
+    }
+
+    fn printStatement(compiler: *Compiler) void {
+        compiler.expression();
+        compiler.parser.consume(.semicolon, "Expect ';' after value.");
+        compiler.emitByte(@intFromEnum(Chunk.OpCode.op_print));
+    }
+
+    fn declaration(compiler: *Compiler) void {
+        compiler.statement();
+    }
+
+    fn statement(compiler: *Compiler) void {
+        if (compiler.parser.match(.print)) {
+            compiler.printStatement();
+        }
     }
 
     fn emitByte(compiler: *Compiler, byte: u8) void {
@@ -279,8 +305,11 @@ pub fn compile(vm: *VM, source: []const u8, chunk: *Chunk) bool {
     compiler.init(vm, &parser, chunk);
 
     parser.advance();
-    compiler.expression();
-    parser.consume(.eof, "Expect end of expression.");
+
+    while (!compiler.parser.match(.eof)) {
+        compiler.declaration();
+    }
+
     compiler.endCompiler();
 
     return !parser.had_error;

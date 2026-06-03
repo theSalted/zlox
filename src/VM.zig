@@ -171,9 +171,11 @@ pub fn run(vm: *VM) InterpretResult {
                 }
                 vm.push(.{ .val_number = -vm.pop().val_number });
             },
-            .op_return => {
+            .op_print => {
                 val.printValue(vm.pop());
                 print("\n", .{});
+            },
+            .op_return => {
                 return .interpret_ok;
             },
         }
