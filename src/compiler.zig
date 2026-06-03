@@ -118,19 +118,45 @@ const Compiler = struct {
         compiler.parsePrecedence(.assignment);
     }
 
+    fn expressionStatement(compiler: *Compiler) void {
+        compiler.expression();
+        compiler.parser.consume(.semicolon, "Expect ';' after value.");
+        compiler.emitByte(@intFromEnum(Chunk.OpCode.op_pop));
+    }
+
     fn printStatement(compiler: *Compiler) void {
         compiler.expression();
         compiler.parser.consume(.semicolon, "Expect ';' after value.");
         compiler.emitByte(@intFromEnum(Chunk.OpCode.op_print));
     }
 
+    fn synchronize(compiler: *Compiler) void {
+        compiler.parser.panic_mode = false;
+
+        while (compiler.parser.current.type != .eof) {
+            if (compiler.parser.previous.type == .semicolon) return;
+            switch (compiler.parser.current.type) {
+                .class, .fun, .@"var", .@"for", .@"if", .@"while", .print, .@"return" => {
+                    return;
+                },
+                else => {},
+            }
+
+            compiler.parser.advance();
+        }
+    }
+
     fn declaration(compiler: *Compiler) void {
         compiler.statement();
+
+        if (compiler.parser.panic_mode) compiler.synchronize();
     }
 
     fn statement(compiler: *Compiler) void {
         if (compiler.parser.match(.print)) {
             compiler.printStatement();
+        } else {
+            compiler.expressionStatement();
         }
     }
 

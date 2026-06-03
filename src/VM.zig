@@ -114,6 +114,7 @@ pub fn run(vm: *VM) InterpretResult {
             .op_nil => vm.push(.{ .val_nil = {} }),
             .op_true => vm.push(.{ .val_bool = true }),
             .op_false => vm.push(.{ .val_bool = false }),
+            .op_pop => _ = vm.pop(),
             .op_equal => {
                 const b = vm.pop();
                 const a = vm.pop();
