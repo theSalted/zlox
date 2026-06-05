@@ -24,33 +24,22 @@ chunk: *Chunk,
 ip: [*]u8,
 stack: [stack_max]Value,
 stack_top: [*]Value,
+globals: Table,
 strings: Table,
 objects: ?*object.Object,
 allocator: std.mem.Allocator,
-
-fn resetStack(vm: *VM) void {
-    vm.stack_top = &vm.stack;
-}
-
-fn runtimeError(vm: *VM, comptime fmt: []const u8, args: anytype) void {
-    std.debug.print(fmt ++ "\n", args);
-
-    const instruction = @intFromPtr(vm.ip) - @intFromPtr(vm.chunk.code.?) - 1;
-    const line = vm.chunk.lines.?[instruction];
-    std.debug.print("[line {d}] in script\n", .{line});
-
-    vm.resetStack();
-}
 
 pub fn init(vm: *VM, allocator: std.mem.Allocator) void {
     vm.allocator = allocator;
     vm.objects = null;
     vm.resetStack();
+    vm.globals.init(allocator);
     vm.strings.init(allocator);
 }
 
 pub fn free(vm: *VM) void {
     memory.freeObjects(vm);
+    vm.globals.free();
     vm.strings.free();
 }
 
@@ -75,19 +64,6 @@ pub fn isFalsy(value: Value) bool {
         .val_number => false,
         .val_object => false,
     };
-}
-
-fn concatenate(vm: *VM) void {
-    const b = object.asString(vm.pop());
-    const a = object.asString(vm.pop());
-
-    const length = a.len + b.len;
-    const chars = memory.allocate(vm.allocator, u8, length);
-    @memcpy(chars[0..a.len], a.chars[0..a.len]);
-    @memcpy(chars[a.len .. a.len + b.len], b.chars[0..b.len]);
-
-    const result = object.takeString(vm, chars.ptr, length);
-    vm.push(.{ .val_object = &result.obj });
 }
 
 pub fn run(vm: *VM) InterpretResult {
@@ -115,6 +91,11 @@ pub fn run(vm: *VM) InterpretResult {
             .op_true => vm.push(.{ .val_bool = true }),
             .op_false => vm.push(.{ .val_bool = false }),
             .op_pop => _ = vm.pop(),
+            .op_define_global => {
+                const name = vm.readString();
+                _ = vm.globals.set(name, vm.peek(0));
+                _ = vm.pop();
+            },
             .op_equal => {
                 const b = vm.pop();
                 const a = vm.pop();
@@ -202,6 +183,14 @@ pub fn interpret(vm: *VM, source: []const u8) InterpretResult {
     return result;
 }
 
+fn readString(vm: *VM) *object.ObjectString {
+    return object.asString(vm.readConstant());
+}
+
+fn readConstant(vm: *VM) Value {
+    return vm.chunk.constants.values.?[readBytes(vm)];
+}
+
 fn readBytes(vm: *VM) u8 {
     const b = vm.ip[0];
     vm.ip += 1;
@@ -228,6 +217,29 @@ fn binaryOp(vm: *VM, comptime op: u8) InterpretResult {
     return .interpret_ok;
 }
 
-fn readConstant(vm: *VM) Value {
-    return vm.chunk.constants.values.?[readBytes(vm)];
+fn resetStack(vm: *VM) void {
+    vm.stack_top = &vm.stack;
+}
+
+fn runtimeError(vm: *VM, comptime fmt: []const u8, args: anytype) void {
+    std.debug.print(fmt ++ "\n", args);
+
+    const instruction = @intFromPtr(vm.ip) - @intFromPtr(vm.chunk.code.?) - 1;
+    const line = vm.chunk.lines.?[instruction];
+    std.debug.print("[line {d}] in script\n", .{line});
+
+    vm.resetStack();
+}
+
+fn concatenate(vm: *VM) void {
+    const b = object.asString(vm.pop());
+    const a = object.asString(vm.pop());
+
+    const length = a.len + b.len;
+    const chars = memory.allocate(vm.allocator, u8, length);
+    @memcpy(chars[0..a.len], a.chars[0..a.len]);
+    @memcpy(chars[a.len .. a.len + b.len], b.chars[0..b.len]);
+
+    const result = object.takeString(vm, chars.ptr, length);
+    vm.push(.{ .val_object = &result.obj });
 }

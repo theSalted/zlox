@@ -120,6 +120,19 @@ const Compiler = struct {
         compiler.parsePrecedence(.assignment);
     }
 
+    fn varDeclaration(compiler: *Compiler) void {
+        const global = compiler.parseVariable("Expect variable name.");
+
+        if (compiler.parser.match(.equal)) {
+            compiler.expression();
+        } else {
+            compiler.emitByte(@intFromEnum(Chunk.OpCode.op_nil));
+        }
+        compiler.parser.consume(.semicolon, "Expect ';' after variable declaration.");
+
+        compiler.defineVariable(global);
+    }
+
     fn expressionStatement(compiler: *Compiler) void {
         compiler.expression();
         compiler.parser.consume(.semicolon, "Expect ';' after value.");
@@ -149,7 +162,11 @@ const Compiler = struct {
     }
 
     fn declaration(compiler: *Compiler) void {
-        compiler.statement();
+        if (compiler.parser.match(.@"var")) {
+            compiler.varDeclaration();
+        } else {
+            compiler.statement();
+        }
 
         if (compiler.parser.panic_mode) compiler.synchronize();
     }
@@ -195,10 +212,8 @@ const Compiler = struct {
     fn endCompiler(compiler: *Compiler) void {
         compiler.emitReturn();
 
-        if (common.debug_print_code) {
-            if (compiler.parser.had_error) {
-                debug.disassembleChunk(compiler.currentChunk(), "Error");
-            }
+        if (common.debug_print_code and !compiler.parser.had_error) {
+            debug.disassembleChunk(compiler.currentChunk(), "code");
         }
     }
 
@@ -325,6 +340,19 @@ const Compiler = struct {
             const infix_rule = getRule(compiler.parser.previous.type).infix;
             infix_rule.?(compiler);
         }
+    }
+
+    fn parseVariable(compiler: *Compiler, message: []const u8) u8 {
+        compiler.parser.consume(.identifier, message);
+        return compiler.identifierConstant(compiler.parser.previous);
+    }
+
+    fn identifierConstant(compiler: *Compiler, name: Token) u8 {
+        return compiler.makeConstant(.{ .val_object = &object.copyString(compiler.vm, name.start, name.length).obj });
+    }
+
+    fn defineVariable(compiler: *Compiler, global: u8) void {
+        compiler.emitBytes(@intFromEnum(Chunk.OpCode.op_define_global), global);
     }
 };
 
