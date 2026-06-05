@@ -102,6 +102,14 @@ pub fn run(vm: *VM) InterpretResult {
 
                 vm.push(value);
             },
+            .op_set_global => {
+                const name = vm.readString();
+                if (vm.globals.set(name, vm.peek(0))) {
+                    _ = vm.globals.delete(name);
+                    vm.runtimeError("Undefined variable '{s}'", .{name.chars[0..name.len]});
+                    return .interpret_runtime_error;
+                }
+            },
             .op_define_global => {
                 const name = vm.readString();
                 _ = vm.globals.set(name, vm.peek(0));

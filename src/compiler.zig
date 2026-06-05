@@ -26,7 +26,7 @@ const Precedence = enum {
     primary,
 };
 
-const ParseFn = *const fn (*Compiler) void;
+const ParseFn = *const fn (*Compiler, bool) void;
 
 const ParseRule = struct {
     prefix: ?ParseFn,
@@ -217,7 +217,8 @@ const Compiler = struct {
         }
     }
 
-    fn binary(compiler: *Compiler) void {
+    fn binary(compiler: *Compiler, can_assign: bool) void {
+        _ = can_assign;
         const operator_type = compiler.parser.previous.type;
 
         const rule = getRule(operator_type);
@@ -239,7 +240,8 @@ const Compiler = struct {
         }
     }
 
-    fn literal(compiler: *Compiler) void {
+    fn literal(compiler: *Compiler, can_assign: bool) void {
+        _ = can_assign;
         switch (compiler.parser.previous.type) {
             .false => compiler.emitByte(@intFromEnum(Chunk.OpCode.op_false)),
             .nil => compiler.emitByte(@intFromEnum(Chunk.OpCode.op_nil)),
@@ -248,33 +250,43 @@ const Compiler = struct {
         }
     }
 
-    fn grouping(compiler: *Compiler) void {
+    fn grouping(compiler: *Compiler, can_assign: bool) void {
+        _ = can_assign;
         compiler.expression();
         compiler.parser.consume(.right_paren, "Expect ')' after expression.");
     }
 
-    fn number(compiler: *Compiler) void {
+    fn number(compiler: *Compiler, can_assign: bool) void {
+        _ = can_assign;
         const lexeme = compiler.parser.previous.start[0..compiler.parser.previous.length];
         const value = std.fmt.parseFloat(f64, lexeme) catch unreachable;
         compiler.emitConstant(.{ .val_number = value });
     }
 
-    fn string(compiler: *Compiler) void {
+    fn string(compiler: *Compiler, can_assign: bool) void {
+        _ = can_assign;
         const parser = compiler.parser;
         const str = object.copyString(compiler.vm, parser.previous.start + 1, parser.previous.length - 2);
         compiler.emitConstant(.{ .val_object = &str.obj });
     }
 
-    fn namedVariable(compiler: *Compiler, name: Token) void {
+    fn namedVariable(compiler: *Compiler, name: Token, can_assign: bool) void {
         const arg = compiler.identifierConstant(name);
-        compiler.emitBytes(@intFromEnum(Chunk.OpCode.op_get_global), arg);
+
+        if (can_assign and compiler.parser.match(.equal)) {
+            compiler.expression();
+            compiler.emitBytes(@intFromEnum(Chunk.OpCode.op_set_global), arg);
+        } else {
+            compiler.emitBytes(@intFromEnum(Chunk.OpCode.op_get_global), arg);
+        }
     }
 
-    fn variable(compiler: *Compiler) void {
-        compiler.namedVariable(compiler.parser.previous);
+    fn variable(compiler: *Compiler, can_assign: bool) void {
+        compiler.namedVariable(compiler.parser.previous, can_assign);
     }
 
-    fn unary(compiler: *Compiler) void {
+    fn unary(compiler: *Compiler, can_assign: bool) void {
+        _ = can_assign;
         const operator_type = compiler.parser.previous.type;
 
         compiler.parsePrecedence(.unary);
@@ -332,7 +344,6 @@ const Compiler = struct {
     }
 
     fn parsePrecedence(compiler: *Compiler, precedence: Precedence) void {
-        // todo
         compiler.parser.advance();
 
         const prefix_rule = getRule(compiler.parser.previous.type).prefix;
@@ -342,12 +353,17 @@ const Compiler = struct {
             return;
         }
 
-        prefix_rule.?(compiler);
+        const can_assign = @intFromEnum(precedence) <= @intFromEnum(Precedence.assignment);
+        prefix_rule.?(compiler, can_assign);
 
         while (@intFromEnum(precedence) <= @intFromEnum(getRule(compiler.parser.current.type).precedence)) {
             compiler.parser.advance();
             const infix_rule = getRule(compiler.parser.previous.type).infix;
-            infix_rule.?(compiler);
+            infix_rule.?(compiler, can_assign);
+        }
+
+        if (can_assign and compiler.parser.match(.equal)) {
+            compiler.parser.errorAtPrevious("Invalid assignment target.");
         }
     }
 
