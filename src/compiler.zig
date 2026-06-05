@@ -265,6 +265,15 @@ const Compiler = struct {
         compiler.emitConstant(.{ .val_object = &str.obj });
     }
 
+    fn namedVariable(compiler: *Compiler, name: Token) void {
+        const arg = compiler.identifierConstant(name);
+        compiler.emitBytes(@intFromEnum(Chunk.OpCode.op_get_global), arg);
+    }
+
+    fn variable(compiler: *Compiler) void {
+        compiler.namedVariable(compiler.parser.previous);
+    }
+
     fn unary(compiler: *Compiler) void {
         const operator_type = compiler.parser.previous.type;
 
@@ -298,7 +307,7 @@ const Compiler = struct {
             .greater_equal => .{ .prefix = null, .infix = binary, .precedence = .comparison },
             .less => .{ .prefix = null, .infix = binary, .precedence = .comparison },
             .less_equal => .{ .prefix = null, .infix = binary, .precedence = .comparison },
-            .identifier => .{ .prefix = null, .infix = null, .precedence = .none },
+            .identifier => .{ .prefix = variable, .infix = null, .precedence = .none },
             .string => .{ .prefix = string, .infix = null, .precedence = .none },
             .number => .{ .prefix = number, .infix = null, .precedence = .none },
             .@"and" => .{ .prefix = null, .infix = null, .precedence = .none },

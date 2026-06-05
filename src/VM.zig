@@ -91,6 +91,17 @@ pub fn run(vm: *VM) InterpretResult {
             .op_true => vm.push(.{ .val_bool = true }),
             .op_false => vm.push(.{ .val_bool = false }),
             .op_pop => _ = vm.pop(),
+            .op_get_global => {
+                const name = vm.readString();
+                var value: Value = undefined;
+
+                if (!vm.globals.get(name, &value)) {
+                    vm.runtimeError("Undefined variable '{s}'", .{name.chars[0..name.len]});
+                    return .interpret_runtime_error;
+                }
+
+                vm.push(value);
+            },
             .op_define_global => {
                 const name = vm.readString();
                 _ = vm.globals.set(name, vm.peek(0));
