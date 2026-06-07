@@ -107,7 +107,7 @@ const Parser = struct {
 
 const Local = struct {
     name: Token,
-    depth: usize,
+    depth: isize,
 };
 
 const Compiler = struct {
@@ -147,6 +147,11 @@ const Compiler = struct {
 
     fn endScope(compiler: *Compiler) void {
         compiler.scope_depth -= 1;
+
+        while (compiler.local_count > 0 and compiler.locals[compiler.local_count - 1].depth >= compiler.scope_depth) {
+            compiler.emitByte(@intFromEnum(Chunk.OpCode.op_pop));
+            compiler.local_count -= 1;
+        }
     }
 
     fn varDeclaration(compiler: *Compiler) void {
@@ -402,6 +407,10 @@ const Compiler = struct {
 
     fn parseVariable(compiler: *Compiler, message: []const u8) u8 {
         compiler.parser.consume(.identifier, message);
+
+        compiler.declareVariable();
+        if (compiler.scope_depth > 0) return 0;
+
         return compiler.identifierConstant(compiler.parser.previous);
     }
 
@@ -409,7 +418,48 @@ const Compiler = struct {
         return compiler.makeConstant(.{ .val_object = &object.copyString(compiler.vm, name.start, name.length).obj });
     }
 
+    fn identifiersEqual(compiler: *Compiler, a: Token, b: Token) bool {
+        _ = compiler;
+        if (a.length != b.length) return false;
+        return std.mem.eql(u8, a.start[0..a.length], b.start[0..b.length]);
+    }
+
+    fn addLocal(compiler: *Compiler, name: Token) void {
+        if (compiler.local_count == common.uint8_count) {
+            compiler.parser.errorAtPrevious("Too many local variables in function.");
+            return;
+        }
+
+        const local = &compiler.locals[compiler.local_count];
+        compiler.local_count += 1;
+        local.name = name;
+        local.depth = @intCast(compiler.scope_depth);
+    }
+
+    fn declareVariable(compiler: *Compiler) void {
+        if (compiler.scope_depth == 0) return;
+
+        const name = compiler.parser.previous;
+
+        var i = compiler.local_count;
+        while (i > 0) {
+            i -= 1;
+            const local = compiler.locals[i];
+            if (local.depth != -1 and local.depth < compiler.scope_depth) {
+                break;
+            }
+
+            if (compiler.identifiersEqual(name, local.name)) {
+                compiler.parser.errorAtPrevious("Already a variable with this name in this scope.");
+            }
+        }
+        compiler.addLocal(name);
+    }
+
     fn defineVariable(compiler: *Compiler, global: u8) void {
+        if (compiler.scope_depth > 0) {
+            return;
+        }
         compiler.emitBytes(@intFromEnum(Chunk.OpCode.op_define_global), global);
     }
 };
