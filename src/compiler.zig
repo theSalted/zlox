@@ -105,12 +105,24 @@ const Parser = struct {
     }
 };
 
+const Local = struct {
+    name: Token,
+    depth: usize,
+};
+
 const Compiler = struct {
+    locals: [common.uint8_count]Local,
+    local_count: usize,
+    scope_depth: usize,
+
     parser: *Parser,
     compiling_chunk: *Chunk,
     vm: *VM,
 
     fn init(c: *Compiler, vm: *VM, parser: *Parser, chunk: *Chunk) void {
+        c.local_count = 0;
+        c.scope_depth = 0;
+
         c.vm = vm;
         c.parser = parser;
         c.compiling_chunk = chunk;
@@ -118,6 +130,23 @@ const Compiler = struct {
 
     fn expression(compiler: *Compiler) void {
         compiler.parsePrecedence(.assignment);
+    }
+
+    fn block(compiler: *Compiler) void {
+        const parser = compiler.parser;
+        while (!parser.check(.right_brace) and !parser.check(.eof)) {
+            compiler.declaration();
+        }
+
+        parser.consume(.right_brace, "Expect '}' after block.");
+    }
+
+    fn beginScope(compiler: *Compiler) void {
+        compiler.scope_depth += 1;
+    }
+
+    fn endScope(compiler: *Compiler) void {
+        compiler.scope_depth -= 1;
     }
 
     fn varDeclaration(compiler: *Compiler) void {
@@ -174,6 +203,10 @@ const Compiler = struct {
     fn statement(compiler: *Compiler) void {
         if (compiler.parser.match(.print)) {
             compiler.printStatement();
+        } else if (compiler.parser.match(.left_brace)) {
+            compiler.beginScope();
+            compiler.block();
+            compiler.endScope();
         } else {
             compiler.expressionStatement();
         }
