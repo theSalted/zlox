@@ -1,12 +1,11 @@
 const std = @import("std");
-const common = @import("common.zig");
-const debug = @import("debug.zig");
 const print = std.debug.print;
-const object = @import("object.zig");
 
 const Chunk = @import("Chunk.zig");
+const common = @import("common.zig");
+const debug = @import("debug.zig");
+const object = @import("object.zig");
 const Scanner = @import("Scanner.zig");
-
 const Token = Scanner.Token;
 const TokenType = Scanner.TokenType;
 const Value = @import("value.zig").Value;
