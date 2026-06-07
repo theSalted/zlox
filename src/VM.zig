@@ -80,7 +80,7 @@ pub fn run(vm: *VM) InterpretResult {
             _ = debug.disassembleInstruction(vm.chunk, @intFromPtr(vm.ip) - @intFromPtr(vm.chunk.code.?));
         }
 
-        const instruction = vm.readBytes();
+        const instruction = vm.readByte();
         const op: Chunk.OpCode = @enumFromInt(instruction);
         switch (op) {
             .op_constant => {
@@ -91,6 +91,14 @@ pub fn run(vm: *VM) InterpretResult {
             .op_true => vm.push(.{ .val_bool = true }),
             .op_false => vm.push(.{ .val_bool = false }),
             .op_pop => _ = vm.pop(),
+            .op_get_local => {
+                const slot = vm.readByte();
+                vm.push(vm.stack[slot]);
+            },
+            .op_set_local => {
+                const slot = vm.readByte();
+                vm.stack[slot] = vm.peek(0);
+            },
             .op_get_global => {
                 const name = vm.readString();
                 var value: Value = undefined;
@@ -207,10 +215,10 @@ fn readString(vm: *VM) *object.ObjectString {
 }
 
 fn readConstant(vm: *VM) Value {
-    return vm.chunk.constants.values.?[readBytes(vm)];
+    return vm.chunk.constants.values.?[readByte(vm)];
 }
 
-fn readBytes(vm: *VM) u8 {
+fn readByte(vm: *VM) u8 {
     const b = vm.ip[0];
     vm.ip += 1;
     return b;

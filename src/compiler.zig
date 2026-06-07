@@ -308,14 +308,40 @@ const Compiler = struct {
         compiler.emitConstant(.{ .val_object = &str.obj });
     }
 
+    fn resolveLocal(compiler: *Compiler, name: Token) isize {
+        var i = compiler.local_count;
+        while (i > 0) {
+            i -= 1;
+            const local = compiler.locals[i];
+            if (compiler.identifiersEqual(name, local.name)) {
+                if (local.depth == -1) {
+                    compiler.parser.errorAtPrevious("Can't read local variable in its own initializer.");
+                }
+                return @intCast(i);
+            }
+        }
+        return -1;
+    }
+
     fn namedVariable(compiler: *Compiler, name: Token, can_assign: bool) void {
-        const arg = compiler.identifierConstant(name);
+        var get_op: u8 = undefined;
+        var set_op: u8 = undefined;
+
+        var arg = compiler.resolveLocal(name);
+        if (arg != -1) {
+            get_op = @intFromEnum(Chunk.OpCode.op_get_local);
+            set_op = @intFromEnum(Chunk.OpCode.op_set_local);
+        } else {
+            arg = compiler.identifierConstant(name);
+            get_op = @intFromEnum(Chunk.OpCode.op_get_global);
+            set_op = @intFromEnum(Chunk.OpCode.op_set_global);
+        }
 
         if (can_assign and compiler.parser.match(.equal)) {
             compiler.expression();
-            compiler.emitBytes(@intFromEnum(Chunk.OpCode.op_set_global), arg);
+            compiler.emitBytes(set_op, @intCast(arg));
         } else {
-            compiler.emitBytes(@intFromEnum(Chunk.OpCode.op_get_global), arg);
+            compiler.emitBytes(get_op, @intCast(arg));
         }
     }
 
@@ -433,7 +459,7 @@ const Compiler = struct {
         const local = &compiler.locals[compiler.local_count];
         compiler.local_count += 1;
         local.name = name;
-        local.depth = @intCast(compiler.scope_depth);
+        local.depth = -1;
     }
 
     fn declareVariable(compiler: *Compiler) void {
@@ -456,8 +482,13 @@ const Compiler = struct {
         compiler.addLocal(name);
     }
 
+    fn markInitialized(compiler: *Compiler) void {
+        compiler.locals[compiler.local_count - 1].depth = @intCast(compiler.scope_depth);
+    }
+
     fn defineVariable(compiler: *Compiler, global: u8) void {
         if (compiler.scope_depth > 0) {
+            compiler.markInitialized();
             return;
         }
         compiler.emitBytes(@intFromEnum(Chunk.OpCode.op_define_global), global);
