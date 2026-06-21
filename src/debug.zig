@@ -29,8 +29,8 @@ pub fn disassembleInstruction(chunk: *const Chunk, offset: usize) usize {
     switch (op) {
         .constant => return constantInstruction("OP_CONSTANT", chunk, offset),
         .nil => return simpleInstruction("OP_NIL", offset),
-        .@"true" => return simpleInstruction("OP_TRUE", offset),
-        .@"false" => return simpleInstruction("OP_FALSE", offset),
+        .true => return simpleInstruction("OP_TRUE", offset),
+        .false => return simpleInstruction("OP_FALSE", offset),
         .pop => return simpleInstruction("OP_POP", offset),
         .define_global => return constantInstruction("OP_DEFINE_GLOBAL", chunk, offset),
         .get_local => return byteInstruction("OP_GET_LOCAL", chunk, offset),
@@ -47,8 +47,8 @@ pub fn disassembleInstruction(chunk: *const Chunk, offset: usize) usize {
         .not => return simpleInstruction("OP_NOT", offset),
         .negate => return simpleInstruction("OP_NEGATE", offset),
         .print => return simpleInstruction("OP_PRINT", offset),
-        .jump => return simpleInstruction("OP_JUMP", offset),
-        .jump_if_false => return simpleInstruction("OP_JUMP_IF_FALSE", offset),
+        .jump => return jumpInstruction("OP_JUMP", 1, chunk, offset),
+        .jump_if_false => return jumpInstruction("OP_JUMP_IF_FALSE", 1, chunk, offset),
         .@"return" => return simpleInstruction("OP_RETURN", offset),
     }
 }
@@ -63,6 +63,17 @@ fn byteInstruction(name: []const u8, chunk: *const Chunk, offset: usize) usize {
     const slot = chunk.code.?[offset + 1];
     print("{s:<16} {d:>4} ", .{ name, slot });
     return offset + 2;
+}
+
+fn jumpInstruction(name: []const u8, sign: i32, chunk: *const Chunk, offset: usize) usize {
+    const code = chunk.code.?;
+    var jump: u16 = @as(u16, code[offset + 1]) << 8;
+    jump |= code[offset + 2];
+
+    const target = @as(i32, @intCast(offset)) + 3 + sign * @as(i32, jump);
+    print("{s:<16} {d:>4} -> {d}\n", .{ name, offset, target });
+
+    return offset + 3;
 }
 
 fn constantInstruction(name: []const u8, chunk: *const Chunk, offset: usize) usize {

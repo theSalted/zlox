@@ -186,6 +186,7 @@ const Compiler = struct {
         const elseJump = compiler.emitJump(@intFromEnum(Chunk.OpCode.jump));
 
         compiler.patchJump(thenJump);
+        compiler.emitByte(@intFromEnum(Chunk.OpCode.pop));
 
         if (compiler.parser.match(.@"else")) compiler.statement();
         compiler.patchJump(elseJump);
