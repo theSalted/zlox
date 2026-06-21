@@ -172,6 +172,17 @@ const Compiler = struct {
         compiler.emitByte(@intFromEnum(Chunk.OpCode.op_pop));
     }
 
+    fn ifStatement(compiler: *Compiler) void {
+        compiler.parser.consume(.left_paren, "Expect '(' after 'if'.");
+        compiler.expression();
+        compiler.parser.consume(.right_paren, "Expect ')' after condition.");
+
+        const thenJump = compiler.emitJump(@intFromEnum(Chunk.OpCode.op_jump_if_false));
+        compiler.statement();
+
+        compiler.patchJump(thenJump);
+    }
+
     fn printStatement(compiler: *Compiler) void {
         compiler.expression();
         compiler.parser.consume(.semicolon, "Expect ';' after value.");
@@ -207,6 +218,8 @@ const Compiler = struct {
     fn statement(compiler: *Compiler) void {
         if (compiler.parser.match(.print)) {
             compiler.printStatement();
+        } else if (compiler.parser.match(.@"if")) {
+            compiler.ifStatement();
         } else if (compiler.parser.match(.left_brace)) {
             compiler.beginScope();
             compiler.block();
@@ -225,6 +238,13 @@ const Compiler = struct {
         compiler.emitByte(byte2);
     }
 
+    fn emitJump(compiler: *Compiler, instruction: u8) usize {
+        compiler.emitByte(instruction);
+        compiler.emitByte(0xff);
+        compiler.emitByte(0xff);
+        return compiler.currentChunk().count - 2;
+    }
+
     fn emitReturn(compiler: *Compiler) void {
         compiler.emitByte(@intFromEnum(Chunk.OpCode.op_return));
     }
@@ -240,6 +260,18 @@ const Compiler = struct {
 
     fn emitConstant(compiler: *Compiler, value: Value) void {
         compiler.emitBytes(@intFromEnum(Chunk.OpCode.op_constant), compiler.makeConstant(value));
+    }
+
+    fn patchJump(compiler: *Compiler, offset: usize) void {
+        const jump = compiler.currentChunk().count - offset - 2;
+
+        if (jump > std.math.maxInt(u16)) {
+            compiler.parser.errorAtPrevious("Too much code to jump over.");
+        }
+
+        const code = compiler.currentChunk().code.?;
+        code[offset] = @intCast((jump >> 8) & 0xff);
+        code[offset + 1] = @intCast(jump & 0xff);
     }
 
     fn currentChunk(compiler: *Compiler) *Chunk {

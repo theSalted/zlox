@@ -184,6 +184,10 @@ pub fn run(vm: *VM) InterpretResult {
                 val.printValue(vm.pop());
                 print("\n", .{});
             },
+            .op_jump_if_false => {
+                const offset = vm.readShort();
+                if (isFalsy(vm.peek(0))) vm.ip += offset;
+            },
             .op_return => {
                 return .interpret_ok;
             },
@@ -216,6 +220,13 @@ fn readString(vm: *VM) *object.ObjectString {
 
 fn readConstant(vm: *VM) Value {
     return vm.chunk.constants.values.?[readByte(vm)];
+}
+
+fn readShort(vm: *VM) usize {
+    vm.ip += 2;
+    const hi: u16 = (vm.ip - 2)[0];
+    const lo: u16 = (vm.ip - 1)[0];
+    return (hi << 8) | lo;
 }
 
 fn readByte(vm: *VM) u8 {
