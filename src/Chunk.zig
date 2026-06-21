@@ -10,8 +10,8 @@ const Chunk = @This();
 pub const OpCode = enum(u8) {
     constant,
     nil,
-    @"true",
-    @"false",
+    true,
+    false,
     pop,
     get_local,
     set_local,
@@ -30,6 +30,7 @@ pub const OpCode = enum(u8) {
     print,
     jump,
     jump_if_false,
+    loop,
     @"return",
 };
 

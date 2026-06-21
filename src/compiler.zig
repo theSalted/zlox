@@ -197,6 +197,21 @@ const Compiler = struct {
         compiler.emitByte(@intFromEnum(Chunk.OpCode.print));
     }
 
+    fn whileStatement(compiler: *Compiler) void {
+        const loopStart = compiler.currentChunk().count;
+        compiler.parser.consume(.left_paren, "Expect '(' after 'while'.");
+        compiler.expression();
+        compiler.parser.consume(.right_paren, "Expect ')' after condition.");
+
+        const exitJump = compiler.emitJump(@intFromEnum(Chunk.OpCode.jump_if_false));
+        compiler.emitByte(@intFromEnum(Chunk.OpCode.pop));
+        compiler.statement();
+        compiler.emitLoop(loopStart);
+
+        compiler.patchJump(exitJump);
+        compiler.emitByte(@intFromEnum(Chunk.OpCode.pop));
+    }
+
     fn synchronize(compiler: *Compiler) void {
         compiler.parser.panic_mode = false;
 
@@ -228,6 +243,8 @@ const Compiler = struct {
             compiler.printStatement();
         } else if (compiler.parser.match(.@"if")) {
             compiler.ifStatement();
+        } else if (compiler.parser.match(.@"while")) {
+            compiler.whileStatement();
         } else if (compiler.parser.match(.left_brace)) {
             compiler.beginScope();
             compiler.block();
@@ -244,6 +261,16 @@ const Compiler = struct {
     fn emitBytes(compiler: *Compiler, byte1: u8, byte2: u8) void {
         compiler.emitByte(byte1);
         compiler.emitByte(byte2);
+    }
+
+    fn emitLoop(compiler: *Compiler, loopStart: usize) void {
+        compiler.emitByte(@intFromEnum(Chunk.OpCode.loop));
+
+        const offset = compiler.currentChunk().count - loopStart + 2;
+        if (offset > std.math.maxInt(u16)) compiler.parser.errorAtPrevious("Loop body too large.");
+
+        compiler.emitByte(@intCast((offset >> 8) & 0xff));
+        compiler.emitByte(@intCast(offset & 0xff));
     }
 
     fn emitJump(compiler: *Compiler, instruction: u8) usize {

@@ -88,8 +88,8 @@ pub fn run(vm: *VM) InterpretResult {
                 vm.push(constant);
             },
             .nil => vm.push(.{ .val_nil = {} }),
-            .@"true" => vm.push(.{ .val_bool = true }),
-            .@"false" => vm.push(.{ .val_bool = false }),
+            .true => vm.push(.{ .val_bool = true }),
+            .false => vm.push(.{ .val_bool = false }),
             .pop => _ = vm.pop(),
             .get_local => {
                 const slot = vm.readByte();
@@ -191,6 +191,10 @@ pub fn run(vm: *VM) InterpretResult {
             .jump_if_false => {
                 const offset = vm.readShort();
                 if (isFalsy(vm.peek(0))) vm.ip += offset;
+            },
+            .loop => {
+                const offset = vm.readShort();
+                vm.ip -= offset;
             },
             .@"return" => {
                 return .interpret_ok;
