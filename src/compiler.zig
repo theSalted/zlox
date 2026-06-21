@@ -148,7 +148,7 @@ const Compiler = struct {
         compiler.scope_depth -= 1;
 
         while (compiler.local_count > 0 and compiler.locals[compiler.local_count - 1].depth >= compiler.scope_depth) {
-            compiler.emitByte(@intFromEnum(Chunk.OpCode.op_pop));
+            compiler.emitByte(@intFromEnum(Chunk.OpCode.pop));
             compiler.local_count -= 1;
         }
     }
@@ -159,7 +159,7 @@ const Compiler = struct {
         if (compiler.parser.match(.equal)) {
             compiler.expression();
         } else {
-            compiler.emitByte(@intFromEnum(Chunk.OpCode.op_nil));
+            compiler.emitByte(@intFromEnum(Chunk.OpCode.nil));
         }
         compiler.parser.consume(.semicolon, "Expect ';' after variable declaration.");
 
@@ -169,7 +169,7 @@ const Compiler = struct {
     fn expressionStatement(compiler: *Compiler) void {
         compiler.expression();
         compiler.parser.consume(.semicolon, "Expect ';' after value.");
-        compiler.emitByte(@intFromEnum(Chunk.OpCode.op_pop));
+        compiler.emitByte(@intFromEnum(Chunk.OpCode.pop));
     }
 
     fn ifStatement(compiler: *Compiler) void {
@@ -177,16 +177,24 @@ const Compiler = struct {
         compiler.expression();
         compiler.parser.consume(.right_paren, "Expect ')' after condition.");
 
-        const thenJump = compiler.emitJump(@intFromEnum(Chunk.OpCode.op_jump_if_false));
+        const thenJump = compiler.emitJump(@intFromEnum(Chunk.OpCode.jump_if_false));
+
+        compiler.emitByte(@intFromEnum(Chunk.OpCode.jump));
+
         compiler.statement();
 
+        const elseJump = compiler.emitJump(@intFromEnum(Chunk.OpCode.jump));
+
         compiler.patchJump(thenJump);
+
+        if (compiler.parser.match(.@"else")) compiler.statement();
+        compiler.patchJump(elseJump);
     }
 
     fn printStatement(compiler: *Compiler) void {
         compiler.expression();
         compiler.parser.consume(.semicolon, "Expect ';' after value.");
-        compiler.emitByte(@intFromEnum(Chunk.OpCode.op_print));
+        compiler.emitByte(@intFromEnum(Chunk.OpCode.print));
     }
 
     fn synchronize(compiler: *Compiler) void {
@@ -246,7 +254,7 @@ const Compiler = struct {
     }
 
     fn emitReturn(compiler: *Compiler) void {
-        compiler.emitByte(@intFromEnum(Chunk.OpCode.op_return));
+        compiler.emitByte(@intFromEnum(Chunk.OpCode.@"return"));
     }
 
     fn makeConstant(compiler: *Compiler, value: Value) u8 {
@@ -259,7 +267,7 @@ const Compiler = struct {
     }
 
     fn emitConstant(compiler: *Compiler, value: Value) void {
-        compiler.emitBytes(@intFromEnum(Chunk.OpCode.op_constant), compiler.makeConstant(value));
+        compiler.emitBytes(@intFromEnum(Chunk.OpCode.constant), compiler.makeConstant(value));
     }
 
     fn patchJump(compiler: *Compiler, offset: usize) void {
@@ -295,16 +303,16 @@ const Compiler = struct {
         compiler.parsePrecedence(@enumFromInt(@intFromEnum(rule.precedence) + 1));
 
         switch (operator_type) {
-            .bang_equal => compiler.emitBytes(@intFromEnum(Chunk.OpCode.op_equal), @intFromEnum(Chunk.OpCode.op_not)),
-            .equal_equal => compiler.emitByte(@intFromEnum(Chunk.OpCode.op_equal)),
-            .greater => compiler.emitByte(@intFromEnum(Chunk.OpCode.op_greater)),
-            .greater_equal => compiler.emitBytes(@intFromEnum(Chunk.OpCode.op_less), @intFromEnum(Chunk.OpCode.op_not)),
-            .less => compiler.emitByte(@intFromEnum(Chunk.OpCode.op_less)),
-            .less_equal => compiler.emitBytes(@intFromEnum(Chunk.OpCode.op_greater), @intFromEnum(Chunk.OpCode.op_not)),
-            .plus => compiler.emitByte(@intFromEnum(Chunk.OpCode.op_add)),
-            .minus => compiler.emitByte(@intFromEnum(Chunk.OpCode.op_subtract)),
-            .star => compiler.emitByte(@intFromEnum(Chunk.OpCode.op_multiply)),
-            .slash => compiler.emitByte(@intFromEnum(Chunk.OpCode.op_divide)),
+            .bang_equal => compiler.emitBytes(@intFromEnum(Chunk.OpCode.equal), @intFromEnum(Chunk.OpCode.not)),
+            .equal_equal => compiler.emitByte(@intFromEnum(Chunk.OpCode.equal)),
+            .greater => compiler.emitByte(@intFromEnum(Chunk.OpCode.greater)),
+            .greater_equal => compiler.emitBytes(@intFromEnum(Chunk.OpCode.less), @intFromEnum(Chunk.OpCode.not)),
+            .less => compiler.emitByte(@intFromEnum(Chunk.OpCode.less)),
+            .less_equal => compiler.emitBytes(@intFromEnum(Chunk.OpCode.greater), @intFromEnum(Chunk.OpCode.not)),
+            .plus => compiler.emitByte(@intFromEnum(Chunk.OpCode.add)),
+            .minus => compiler.emitByte(@intFromEnum(Chunk.OpCode.subtract)),
+            .star => compiler.emitByte(@intFromEnum(Chunk.OpCode.multiply)),
+            .slash => compiler.emitByte(@intFromEnum(Chunk.OpCode.divide)),
             else => return,
         }
     }
@@ -312,9 +320,9 @@ const Compiler = struct {
     fn literal(compiler: *Compiler, can_assign: bool) void {
         _ = can_assign;
         switch (compiler.parser.previous.type) {
-            .false => compiler.emitByte(@intFromEnum(Chunk.OpCode.op_false)),
-            .nil => compiler.emitByte(@intFromEnum(Chunk.OpCode.op_nil)),
-            .true => compiler.emitByte(@intFromEnum(Chunk.OpCode.op_true)),
+            .false => compiler.emitByte(@intFromEnum(Chunk.OpCode.false)),
+            .nil => compiler.emitByte(@intFromEnum(Chunk.OpCode.nil)),
+            .true => compiler.emitByte(@intFromEnum(Chunk.OpCode.true)),
             else => return,
         }
     }
@@ -360,12 +368,12 @@ const Compiler = struct {
 
         var arg = compiler.resolveLocal(name);
         if (arg != -1) {
-            get_op = @intFromEnum(Chunk.OpCode.op_get_local);
-            set_op = @intFromEnum(Chunk.OpCode.op_set_local);
+            get_op = @intFromEnum(Chunk.OpCode.get_local);
+            set_op = @intFromEnum(Chunk.OpCode.set_local);
         } else {
             arg = compiler.identifierConstant(name);
-            get_op = @intFromEnum(Chunk.OpCode.op_get_global);
-            set_op = @intFromEnum(Chunk.OpCode.op_set_global);
+            get_op = @intFromEnum(Chunk.OpCode.get_global);
+            set_op = @intFromEnum(Chunk.OpCode.set_global);
         }
 
         if (can_assign and compiler.parser.match(.equal)) {
@@ -387,8 +395,8 @@ const Compiler = struct {
         compiler.parsePrecedence(.unary);
 
         switch (operator_type) {
-            .bang => compiler.emitByte(@intFromEnum(Chunk.OpCode.op_not)),
-            .minus => compiler.emitByte(@intFromEnum(Chunk.OpCode.op_negate)),
+            .bang => compiler.emitByte(@intFromEnum(Chunk.OpCode.not)),
+            .minus => compiler.emitByte(@intFromEnum(Chunk.OpCode.negate)),
             else => return,
         }
     }
@@ -522,7 +530,7 @@ const Compiler = struct {
             compiler.markInitialized();
             return;
         }
-        compiler.emitBytes(@intFromEnum(Chunk.OpCode.op_define_global), global);
+        compiler.emitBytes(@intFromEnum(Chunk.OpCode.define_global), global);
     }
 };
 

@@ -83,23 +83,23 @@ pub fn run(vm: *VM) InterpretResult {
         const instruction = vm.readByte();
         const op: Chunk.OpCode = @enumFromInt(instruction);
         switch (op) {
-            .op_constant => {
+            .constant => {
                 const constant: Value = readConstant(vm);
                 vm.push(constant);
             },
-            .op_nil => vm.push(.{ .val_nil = {} }),
-            .op_true => vm.push(.{ .val_bool = true }),
-            .op_false => vm.push(.{ .val_bool = false }),
-            .op_pop => _ = vm.pop(),
-            .op_get_local => {
+            .nil => vm.push(.{ .val_nil = {} }),
+            .@"true" => vm.push(.{ .val_bool = true }),
+            .@"false" => vm.push(.{ .val_bool = false }),
+            .pop => _ = vm.pop(),
+            .get_local => {
                 const slot = vm.readByte();
                 vm.push(vm.stack[slot]);
             },
-            .op_set_local => {
+            .set_local => {
                 const slot = vm.readByte();
                 vm.stack[slot] = vm.peek(0);
             },
-            .op_get_global => {
+            .get_global => {
                 const name = vm.readString();
                 var value: Value = undefined;
 
@@ -110,7 +110,7 @@ pub fn run(vm: *VM) InterpretResult {
 
                 vm.push(value);
             },
-            .op_set_global => {
+            .set_global => {
                 const name = vm.readString();
                 if (vm.globals.set(name, vm.peek(0))) {
                     _ = vm.globals.delete(name);
@@ -118,17 +118,17 @@ pub fn run(vm: *VM) InterpretResult {
                     return .interpret_runtime_error;
                 }
             },
-            .op_define_global => {
+            .define_global => {
                 const name = vm.readString();
                 _ = vm.globals.set(name, vm.peek(0));
                 _ = vm.pop();
             },
-            .op_equal => {
+            .equal => {
                 const b = vm.pop();
                 const a = vm.pop();
                 vm.push(.{ .val_bool = val.valuesEqual(a, b) });
             },
-            .op_greater => {
+            .greater => {
                 if (vm.peek(0) != .val_number or vm.peek(1) != .val_number) {
                     vm.runtimeError("Operands must be numbers.", .{});
                     return .interpret_runtime_error;
@@ -137,7 +137,7 @@ pub fn run(vm: *VM) InterpretResult {
                 const a = vm.pop().val_number;
                 vm.push(.{ .val_bool = a > b });
             },
-            .op_less => {
+            .less => {
                 if (vm.peek(0) != .val_number or vm.peek(1) != .val_number) {
                     vm.runtimeError("Operands must be numbers.", .{});
                     return .interpret_runtime_error;
@@ -146,7 +146,7 @@ pub fn run(vm: *VM) InterpretResult {
                 const a = vm.pop().val_number;
                 vm.push(.{ .val_bool = a < b });
             },
-            .op_add => {
+            .add => {
                 if (object.isString(vm.peek(0)) and object.isString(vm.peek(1))) {
                     concatenate(vm);
                 } else if (vm.peek(0) == .val_number and vm.peek(1) == .val_number) {
@@ -158,37 +158,41 @@ pub fn run(vm: *VM) InterpretResult {
                     return .interpret_runtime_error;
                 }
             },
-            .op_subtract => {
+            .subtract => {
                 const r = vm.binaryOp('-');
                 if (r != .interpret_ok) return r;
             },
-            .op_multiply => {
+            .multiply => {
                 const r = vm.binaryOp('*');
                 if (r != .interpret_ok) return r;
             },
-            .op_divide => {
+            .divide => {
                 const r = vm.binaryOp('/');
                 if (r != .interpret_ok) return r;
             },
-            .op_not => {
+            .not => {
                 vm.push(.{ .val_bool = isFalsy(vm.pop()) });
             },
-            .op_negate => {
+            .negate => {
                 if (vm.peek(0) != .val_number) {
                     vm.runtimeError("Operand must be a number.", .{});
                     return .interpret_runtime_error;
                 }
                 vm.push(.{ .val_number = -vm.pop().val_number });
             },
-            .op_print => {
+            .print => {
                 val.printValue(vm.pop());
                 print("\n", .{});
             },
-            .op_jump_if_false => {
+            .jump => {
+                const offset = vm.readShort();
+                vm.ip += offset;
+            },
+            .jump_if_false => {
                 const offset = vm.readShort();
                 if (isFalsy(vm.peek(0))) vm.ip += offset;
             },
-            .op_return => {
+            .@"return" => {
                 return .interpret_ok;
             },
         }
