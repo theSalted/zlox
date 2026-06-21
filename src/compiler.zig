@@ -178,8 +178,7 @@ const Compiler = struct {
         compiler.parser.consume(.right_paren, "Expect ')' after condition.");
 
         const thenJump = compiler.emitJump(@intFromEnum(Chunk.OpCode.jump_if_false));
-
-        compiler.emitByte(@intFromEnum(Chunk.OpCode.jump));
+        compiler.emitByte(@intFromEnum(Chunk.OpCode.pop));
 
         compiler.statement();
 
