@@ -5,7 +5,7 @@ const val = @import("value.zig");
 const ValueArray = val.ValueArray;
 const Value = val.Value;
 
-const Chunk = @This();
+pub const Chunk = @This();
 
 pub const OpCode = enum(u8) {
     constant,

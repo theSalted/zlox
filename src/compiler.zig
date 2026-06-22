@@ -8,6 +8,7 @@ const object = @import("object.zig");
 const Scanner = @import("Scanner.zig");
 const Token = Scanner.Token;
 const TokenType = Scanner.TokenType;
+const ObjectFunction = object.ObjectFunction;
 const Value = @import("value.zig").Value;
 const VM = @import("VM.zig").VM;
 
@@ -109,22 +110,37 @@ const Local = struct {
     depth: isize,
 };
 
+const FunctionType = enum {
+    function,
+    script,
+};
+
 const Compiler = struct {
+    function: ?*ObjectFunction,
+    type: FunctionType,
+
     locals: [common.uint8_count]Local,
     local_count: usize,
     scope_depth: usize,
 
     parser: *Parser,
-    compiling_chunk: *Chunk,
     vm: *VM,
 
-    fn init(c: *Compiler, vm: *VM, parser: *Parser, chunk: *Chunk) void {
-        c.local_count = 0;
-        c.scope_depth = 0;
+    fn init(compiler: *Compiler, vm: *VM, parser: *Parser, function_type: FunctionType) void {
+        compiler.function = object.newFunction(vm);
+        compiler.type = function_type;
 
-        c.vm = vm;
-        c.parser = parser;
-        c.compiling_chunk = chunk;
+        compiler.local_count = 0;
+        compiler.scope_depth = 0;
+
+        const local = &compiler.locals[compiler.local_count];
+        compiler.local_count += 1;
+        local.depth = 0;
+        local.name.start = "";
+        local.name.length = 0;
+
+        compiler.vm = vm;
+        compiler.parser = parser;
     }
 
     fn expression(compiler: *Compiler) void {
@@ -355,15 +371,19 @@ const Compiler = struct {
     }
 
     fn currentChunk(compiler: *Compiler) *Chunk {
-        return compiler.compiling_chunk;
+        return &compiler.function.?.chunk;
     }
 
-    fn endCompiler(compiler: *Compiler) void {
+    fn endCompiler(compiler: *Compiler) *ObjectFunction {
         compiler.emitReturn();
+        const function = compiler.function.?;
 
         if (common.debug_print_code and !compiler.parser.had_error) {
-            debug.disassembleChunk(compiler.currentChunk(), "code");
+            const name = if (function.name) |n| n.chars[0..n.len] else "<script>";
+            debug.disassembleChunk(compiler.currentChunk(), name);
         }
+
+        return function;
     }
 
     fn binary(compiler: *Compiler, can_assign: bool) void {
@@ -606,7 +626,7 @@ const Compiler = struct {
     }
 };
 
-pub fn compile(vm: *VM, source: []const u8, chunk: *Chunk) bool {
+pub fn compile(vm: *VM, source: []const u8) ?*ObjectFunction {
     var scanner: Scanner = undefined;
     scanner.init(source);
 
@@ -614,7 +634,7 @@ pub fn compile(vm: *VM, source: []const u8, chunk: *Chunk) bool {
     parser.init(&scanner);
 
     var compiler: Compiler = undefined;
-    compiler.init(vm, &parser, chunk);
+    compiler.init(vm, &parser, .script);
 
     parser.advance();
 
@@ -622,7 +642,7 @@ pub fn compile(vm: *VM, source: []const u8, chunk: *Chunk) bool {
         compiler.declaration();
     }
 
-    compiler.endCompiler();
+    const function = compiler.endCompiler();
 
-    return !parser.had_error;
+    return if (parser.had_error) null else function;
 }

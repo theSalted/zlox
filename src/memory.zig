@@ -4,6 +4,7 @@ const object = @import("object.zig");
 const VM = @import("VM.zig").VM;
 const Object = object.Object;
 const ObjectString = object.ObjectString;
+const ObjectFunction = object.ObjectFunction;
 
 pub fn growCapacity(capacity: usize) usize {
     return if (capacity < 8) 8 else capacity * 2;
@@ -29,6 +30,11 @@ pub fn freeObject(vm: *VM, obj: *Object) void {
             const string: *ObjectString = @ptrCast(@alignCast(obj));
             freeArray(u8, vm.allocator, string.chars, string.len);
             vm.allocator.destroy(string);
+        },
+        .function => {
+            const function: *ObjectFunction = @ptrCast(@alignCast(obj));
+            function.chunk.free();
+            vm.allocator.destroy(function);
         },
     }
 }

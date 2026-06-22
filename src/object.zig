@@ -5,14 +5,20 @@ const print = std.debug.print;
 
 const Value = @import("value.zig").Value;
 const VM = @import("VM.zig").VM;
+const Chunk = @import("chunk.zig").Chunk;
 
-pub const ObjectType = enum(u8) {
-    string,
-};
+pub const ObjectType = enum(u8) { string, function };
 
 pub const Object = extern struct {
     type: ObjectType,
     next: ?*Object,
+};
+
+pub const ObjectFunction = struct {
+    obj: Object,
+    arity: usize,
+    chunk: Chunk,
+    name: ?*ObjectString,
 };
 
 pub const ObjectString = extern struct {
@@ -39,6 +45,14 @@ fn allocateObject(vm: *VM, comptime T: type, object_type: ObjectType) *T {
     ptr.obj = .{ .type = object_type, .next = vm.objects };
     vm.objects = &ptr.obj;
     return ptr;
+}
+
+pub fn newFunction(vm: *VM) *ObjectFunction {
+    const function = allocateObject(vm, ObjectFunction, .function);
+    function.arity = 0;
+    function.name = null;
+    function.chunk.init(vm.allocator);
+    return function;
 }
 
 fn allocateString(vm: *VM, chars: [*]const u8, len: usize, hash: u32) *ObjectString {
@@ -83,6 +97,14 @@ pub fn printObject(obj: *Object) void {
         .string => {
             const string: *ObjectString = @ptrCast(@alignCast(obj));
             print("{s}", .{string.chars[0..string.len]});
+        },
+        .function => {
+            const function: *ObjectFunction = @ptrCast(@alignCast(obj));
+            if (function.name == null) {
+                print("<script>", .{});
+                return;
+            }
+            print("<fn {s}>", .{function.name.?.chars[0..function.name.?.len]});
         },
     }
 }
