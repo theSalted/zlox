@@ -5,7 +5,7 @@ const print = std.debug.print;
 
 const Value = @import("value.zig").Value;
 const VM = @import("VM.zig").VM;
-const Chunk = @import("chunk.zig").Chunk;
+const Chunk = @import("Chunk.zig");
 
 pub const ObjectType = enum(u8) { string, function };
 

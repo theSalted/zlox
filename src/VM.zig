@@ -9,6 +9,7 @@ const memory = @import("memory.zig");
 const Value = val.Value;
 const Chunk = @import("Chunk.zig");
 const Table = @import("Table.zig").Table;
+const ObjectFunction = object.ObjectFunction;
 
 const print = std.debug.print;
 
@@ -16,12 +17,38 @@ pub const VM = @This();
 
 pub const InterpretResult = enum(u8) { interpret_ok, interpret_compile_error, interpret_runtime_error };
 
-const stack_max: usize = 256;
+const frames_max: usize = 64;
+const stack_max: usize = frames_max * 256;
 
-// Chunk
+const CallFrame = struct {
+    function: *ObjectFunction,
+    ip: [*]u8,
+    slots: [*]Value,
 
-chunk: *Chunk,
-ip: [*]u8,
+    fn readByte(frame: *CallFrame) u8 {
+        const b = frame.ip[0];
+        frame.ip += 1;
+        return b;
+    }
+
+    fn readShort(frame: *CallFrame) usize {
+        frame.ip += 2;
+        const hi: u16 = (frame.ip - 2)[0];
+        const lo: u16 = (frame.ip - 1)[0];
+        return (hi << 8) | lo;
+    }
+
+    fn readConstant(frame: *CallFrame) Value {
+        return frame.function.chunk.constants.values.?[frame.readByte()];
+    }
+
+    fn readString(frame: *CallFrame) *object.ObjectString {
+        return object.asString(frame.readConstant());
+    }
+};
+
+frames: [frames_max]CallFrame,
+frame_count: usize,
 stack: [stack_max]Value,
 stack_top: [*]Value,
 globals: Table,
@@ -67,6 +94,7 @@ pub fn isFalsy(value: Value) bool {
 }
 
 pub fn run(vm: *VM) InterpretResult {
+    var frame = &vm.frames[vm.frame_count - 1];
     while (true) {
         if (common.debug_trace_execution) {
             print("          ", .{});
@@ -77,14 +105,14 @@ pub fn run(vm: *VM) InterpretResult {
                 print(" ]", .{});
             }
             print("\n", .{});
-            _ = debug.disassembleInstruction(vm.chunk, @intFromPtr(vm.ip) - @intFromPtr(vm.chunk.code.?));
+            _ = debug.disassembleInstruction(&frame.function.chunk, @intFromPtr(frame.ip) - @intFromPtr(frame.function.chunk.code.?));
         }
 
-        const instruction = vm.readByte();
+        const instruction = frame.readByte();
         const op: Chunk.OpCode = @enumFromInt(instruction);
         switch (op) {
             .constant => {
-                const constant: Value = readConstant(vm);
+                const constant: Value = frame.readConstant();
                 vm.push(constant);
             },
             .nil => vm.push(.{ .val_nil = {} }),
@@ -92,15 +120,15 @@ pub fn run(vm: *VM) InterpretResult {
             .false => vm.push(.{ .val_bool = false }),
             .pop => _ = vm.pop(),
             .get_local => {
-                const slot = vm.readByte();
-                vm.push(vm.stack[slot]);
+                const slot = frame.readByte();
+                vm.push(frame.slots[slot]);
             },
             .set_local => {
-                const slot = vm.readByte();
-                vm.stack[slot] = vm.peek(0);
+                const slot = frame.readByte();
+                frame.slots[slot] = vm.peek(0);
             },
             .get_global => {
-                const name = vm.readString();
+                const name = frame.readString();
                 var value: Value = undefined;
 
                 if (!vm.globals.get(name, &value)) {
@@ -111,7 +139,7 @@ pub fn run(vm: *VM) InterpretResult {
                 vm.push(value);
             },
             .set_global => {
-                const name = vm.readString();
+                const name = frame.readString();
                 if (vm.globals.set(name, vm.peek(0))) {
                     _ = vm.globals.delete(name);
                     vm.runtimeError("Undefined variable '{s}'", .{name.chars[0..name.len]});
@@ -119,7 +147,7 @@ pub fn run(vm: *VM) InterpretResult {
                 }
             },
             .define_global => {
-                const name = vm.readString();
+                const name = frame.readString();
                 _ = vm.globals.set(name, vm.peek(0));
                 _ = vm.pop();
             },
@@ -185,16 +213,16 @@ pub fn run(vm: *VM) InterpretResult {
                 print("\n", .{});
             },
             .jump => {
-                const offset = vm.readShort();
-                vm.ip += offset;
+                const offset = frame.readShort();
+                frame.ip += offset;
             },
             .jump_if_false => {
-                const offset = vm.readShort();
-                if (isFalsy(vm.peek(0))) vm.ip += offset;
+                const offset = frame.readShort();
+                if (isFalsy(vm.peek(0))) frame.ip += offset;
             },
             .loop => {
-                const offset = vm.readShort();
-                vm.ip -= offset;
+                const offset = frame.readShort();
+                frame.ip -= offset;
             },
             .@"return" => {
                 return .interpret_ok;
@@ -204,43 +232,18 @@ pub fn run(vm: *VM) InterpretResult {
 }
 
 pub fn interpret(vm: *VM, source: []const u8) InterpretResult {
-    var chunk: Chunk = undefined;
-    chunk.init(vm.allocator);
-    defer chunk.free();
+    const function = compiler.compile(vm, source);
+    if (function == null) return .interpret_compile_error;
 
-    if (!compiler.compile(vm, source, &chunk)) {
-        return .interpret_compile_error;
-    }
+    vm.push(.{ .val_object = &function.?.obj });
 
-    vm.chunk = &chunk;
-    vm.ip = vm.chunk.code.?;
+    const frame = &vm.frames[vm.frame_count];
+    vm.frame_count += 1;
+    frame.function = function.?;
+    frame.ip = function.?.chunk.code.?;
+    frame.slots = &vm.stack;
 
-    const result = vm.run();
-    vm.chunk = undefined;
-    vm.ip = undefined;
-
-    return result;
-}
-
-fn readString(vm: *VM) *object.ObjectString {
-    return object.asString(vm.readConstant());
-}
-
-fn readConstant(vm: *VM) Value {
-    return vm.chunk.constants.values.?[readByte(vm)];
-}
-
-fn readShort(vm: *VM) usize {
-    vm.ip += 2;
-    const hi: u16 = (vm.ip - 2)[0];
-    const lo: u16 = (vm.ip - 1)[0];
-    return (hi << 8) | lo;
-}
-
-fn readByte(vm: *VM) u8 {
-    const b = vm.ip[0];
-    vm.ip += 1;
-    return b;
+    return vm.run();
 }
 
 fn binaryOp(vm: *VM, comptime op: u8) InterpretResult {
@@ -265,13 +268,16 @@ fn binaryOp(vm: *VM, comptime op: u8) InterpretResult {
 
 fn resetStack(vm: *VM) void {
     vm.stack_top = &vm.stack;
+    vm.frame_count = 0;
 }
 
 fn runtimeError(vm: *VM, comptime fmt: []const u8, args: anytype) void {
     std.debug.print(fmt ++ "\n", args);
 
-    const instruction = @intFromPtr(vm.ip) - @intFromPtr(vm.chunk.code.?) - 1;
-    const line = vm.chunk.lines.?[instruction];
+    const frame = &vm.frames[vm.frame_count];
+    vm.frame_count -= 1;
+    const instruction = @intFromPtr(frame.ip) - @intFromPtr(frame.function.chunk.code.?) - 1;
+    const line = frame.function.chunk.lines.?[instruction];
     std.debug.print("[line {d}] in script\n", .{line});
 
     vm.resetStack();
