@@ -172,6 +172,49 @@ const Compiler = struct {
         compiler.emitByte(@intFromEnum(Chunk.OpCode.pop));
     }
 
+    fn forStatement(compiler: *Compiler) void {
+        compiler.beginScope();
+        compiler.parser.consume(.left_paren, "Expect '(' after 'for'.");
+        if (compiler.parser.match(.semicolon)) {
+            // No initializer
+        } else if (compiler.parser.match(.@"var")) {
+            compiler.varDeclaration();
+        } else {
+            compiler.expressionStatement();
+        }
+        var loopStart = compiler.currentChunk().count;
+        var exitJump: isize = -1;
+        if (!compiler.parser.match(.semicolon)) {
+            compiler.expression();
+            compiler.parser.consume(.semicolon, "Expect ';' after loop condition.");
+
+            exitJump = @intCast(compiler.emitJump(@intFromEnum(Chunk.OpCode.jump_if_false)));
+            compiler.emitByte(@intFromEnum(Chunk.OpCode.pop));
+        }
+
+        if (!compiler.parser.match(.right_paren)) {
+            const bodyJump = compiler.emitJump(@intFromEnum(Chunk.OpCode.jump));
+            const incrementStart = compiler.currentChunk().count;
+            compiler.expression();
+            compiler.emitByte(@intFromEnum(Chunk.OpCode.pop));
+            compiler.parser.consume(.right_paren, "Expect ')' after for clauses.");
+
+            compiler.emitLoop(loopStart);
+            loopStart = incrementStart;
+            compiler.patchJump(bodyJump);
+        }
+
+        compiler.statement();
+        compiler.emitLoop(loopStart);
+
+        if (exitJump != -1) {
+            compiler.patchJump(@intCast(exitJump));
+            compiler.emitByte(@intFromEnum(Chunk.OpCode.pop));
+        }
+
+        compiler.endScope();
+    }
+
     fn ifStatement(compiler: *Compiler) void {
         compiler.parser.consume(.left_paren, "Expect '(' after 'if'.");
         compiler.expression();
@@ -241,6 +284,8 @@ const Compiler = struct {
     fn statement(compiler: *Compiler) void {
         if (compiler.parser.match(.print)) {
             compiler.printStatement();
+        } else if (compiler.parser.match(.@"for")) {
+            compiler.forStatement();
         } else if (compiler.parser.match(.@"if")) {
             compiler.ifStatement();
         } else if (compiler.parser.match(.@"while")) {
