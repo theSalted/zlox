@@ -169,6 +169,27 @@ const Compiler = struct {
         }
     }
 
+    fn functionBody(compiler: *Compiler, function_type: FunctionType) void {
+        var inner: Compiler = undefined;
+        inner.init(compiler.vm, compiler.parser, function_type);
+        inner.beginScope();
+
+        inner.parser.consume(.left_paren, "Expect '(' after function name.");
+        inner.parser.consume(.right_paren, "Expect ')' after parameters.");
+        inner.parser.consume(.left_brace, "Expect '{' before function body.");
+        inner.block();
+
+        const func = inner.endCompiler();
+        compiler.emitBytes(@intFromEnum(Chunk.OpCode.constant), compiler.makeConstant(.{ .val_object = &func.obj }));
+    }
+
+    fn functionDeclaration(compiler: *Compiler) void {
+        const global = compiler.parseVariable("Expect function name.");
+        compiler.markInitialized();
+        compiler.functionBody(.function);
+        compiler.defineVariable(global);
+    }
+
     fn varDeclaration(compiler: *Compiler) void {
         const global = compiler.parseVariable("Expect variable name.");
 
@@ -288,7 +309,9 @@ const Compiler = struct {
     }
 
     fn declaration(compiler: *Compiler) void {
-        if (compiler.parser.match(.@"var")) {
+        if (compiler.parser.match(.fun)) {
+            compiler.functionDeclaration();
+        } else if (compiler.parser.match(.@"var")) {
             compiler.varDeclaration();
         } else {
             compiler.statement();
@@ -614,6 +637,7 @@ const Compiler = struct {
     }
 
     fn markInitialized(compiler: *Compiler) void {
+        if (compiler.scope_depth == 0) return;
         compiler.locals[compiler.local_count - 1].depth = @intCast(compiler.scope_depth);
     }
 
