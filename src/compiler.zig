@@ -116,6 +116,7 @@ const FunctionType = enum {
 };
 
 const Compiler = struct {
+    enclosing: ?*Compiler,
     function: ?*ObjectFunction,
     type: FunctionType,
 
@@ -126,7 +127,8 @@ const Compiler = struct {
     parser: *Parser,
     vm: *VM,
 
-    fn init(compiler: *Compiler, vm: *VM, parser: *Parser, function_type: FunctionType) void {
+    fn init(compiler: *Compiler, enclosing: ?*Compiler, vm: *VM, parser: *Parser, function_type: FunctionType) void {
+        compiler.enclosing = enclosing;
         compiler.function = object.newFunction(vm);
         compiler.type = function_type;
 
@@ -171,7 +173,7 @@ const Compiler = struct {
 
     fn functionBody(compiler: *Compiler, function_type: FunctionType) void {
         var inner: Compiler = undefined;
-        inner.init(compiler.vm, compiler.parser, function_type);
+        inner.init(compiler, compiler.vm, compiler.parser, function_type);
         inner.beginScope();
 
         inner.parser.consume(.left_paren, "Expect '(' after function name.");
@@ -179,7 +181,7 @@ const Compiler = struct {
         inner.parser.consume(.left_brace, "Expect '{' before function body.");
         inner.block();
 
-        const func = inner.endCompiler();
+        const func = inner.end();
         compiler.emitBytes(@intFromEnum(Chunk.OpCode.constant), compiler.makeConstant(.{ .val_object = &func.obj }));
     }
 
@@ -397,7 +399,7 @@ const Compiler = struct {
         return &compiler.function.?.chunk;
     }
 
-    fn endCompiler(compiler: *Compiler) *ObjectFunction {
+    fn end(compiler: *Compiler) *ObjectFunction {
         compiler.emitReturn();
         const function = compiler.function.?;
 
@@ -460,6 +462,26 @@ const Compiler = struct {
         const parser = compiler.parser;
         const str = object.copyString(compiler.vm, parser.previous.start + 1, parser.previous.length - 2);
         compiler.emitConstant(.{ .val_object = &str.obj });
+    }
+
+    fn and_(compiler: *Compiler, can_assign: bool) void {
+        _ = can_assign;
+        const end_jump = compiler.emitJump(@intFromEnum(Chunk.OpCode.jump_if_false));
+        compiler.emitByte(@intFromEnum(Chunk.OpCode.pop));
+        compiler.parsePrecedence(.@"and");
+        compiler.patchJump(end_jump);
+    }
+
+    fn or_(compiler: *Compiler, can_assign: bool) void {
+        _ = can_assign;
+        const else_jump = compiler.emitJump(@intFromEnum(Chunk.OpCode.jump_if_false));
+        const end_jump = compiler.emitJump(@intFromEnum(Chunk.OpCode.jump));
+
+        compiler.patchJump(else_jump);
+        compiler.emitByte(@intFromEnum(Chunk.OpCode.pop));
+
+        compiler.parsePrecedence(.@"or");
+        compiler.patchJump(end_jump);
     }
 
     fn resolveLocal(compiler: *Compiler, name: Token) isize {
@@ -540,7 +562,7 @@ const Compiler = struct {
             .identifier => .{ .prefix = variable, .infix = null, .precedence = .none },
             .string => .{ .prefix = string, .infix = null, .precedence = .none },
             .number => .{ .prefix = number, .infix = null, .precedence = .none },
-            .@"and" => .{ .prefix = null, .infix = null, .precedence = .none },
+            .@"and" => .{ .prefix = null, .infix = and_, .precedence = .@"and" },
             .class => .{ .prefix = null, .infix = null, .precedence = .none },
             .@"else" => .{ .prefix = null, .infix = null, .precedence = .none },
             .false => .{ .prefix = literal, .infix = null, .precedence = .none },
@@ -548,7 +570,7 @@ const Compiler = struct {
             .fun => .{ .prefix = null, .infix = null, .precedence = .none },
             .@"if" => .{ .prefix = null, .infix = null, .precedence = .none },
             .nil => .{ .prefix = literal, .infix = null, .precedence = .none },
-            .@"or" => .{ .prefix = null, .infix = null, .precedence = .none },
+            .@"or" => .{ .prefix = null, .infix = or_, .precedence = .@"or" },
             .print => .{ .prefix = null, .infix = null, .precedence = .none },
             .@"return" => .{ .prefix = null, .infix = null, .precedence = .none },
             .super => .{ .prefix = null, .infix = null, .precedence = .none },
@@ -658,7 +680,7 @@ pub fn compile(vm: *VM, source: []const u8) ?*ObjectFunction {
     parser.init(&scanner);
 
     var compiler: Compiler = undefined;
-    compiler.init(vm, &parser, .script);
+    compiler.init(null, vm, &parser, .script);
 
     parser.advance();
 
@@ -666,7 +688,7 @@ pub fn compile(vm: *VM, source: []const u8) ?*ObjectFunction {
         compiler.declaration();
     }
 
-    const function = compiler.endCompiler();
+    const function = compiler.end();
 
     return if (parser.had_error) null else function;
 }
