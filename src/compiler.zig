@@ -134,6 +134,9 @@ const Compiler = struct {
 
         compiler.local_count = 0;
         compiler.scope_depth = 0;
+        if (function_type != FunctionType.script) {
+            compiler.function.?.name = object.copyString(vm, parser.previous.start, parser.previous.length);
+        }
 
         const local = &compiler.locals[compiler.local_count];
         compiler.local_count += 1;
