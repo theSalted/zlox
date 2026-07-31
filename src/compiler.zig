@@ -177,6 +177,17 @@ const Compiler = struct {
         inner.beginScope();
 
         inner.parser.consume(.left_paren, "Expect '(' after function name.");
+        if (!inner.parser.check(.right_paren)) {
+            while (true) {
+                inner.function.?.arity += 1;
+                if (inner.function.?.arity > 255) {
+                    inner.parser.errorAtCurrent("Can't have more than 255 parameters");
+                }
+                const constant = inner.parseVariable("Expect parameter name.");
+                inner.defineVariable(constant);
+                if (!inner.parser.match(.comma)) break;
+            }
+        }
         inner.parser.consume(.right_paren, "Expect ')' after parameters.");
         inner.parser.consume(.left_brace, "Expect '{' before function body.");
         inner.block();
