@@ -112,3 +112,7 @@ pub fn printObject(obj: *Object) void {
 pub inline fn isObjType(value: Value, object_type: ObjectType) bool {
     return value == .val_object and value.val_object.type == object_type;
 }
+
+pub inline fn asFunction(obj: *Object) *ObjectFunction {
+    return @ptrCast(@alignCast(obj));
+}

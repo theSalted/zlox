@@ -84,6 +84,29 @@ pub fn peek(vm: *VM, distance: usize) Value {
     return (vm.stack_top - 1 - distance)[0];
 }
 
+pub fn call(vm: *VM, function: *ObjectFunction, arg_count: u8) bool {
+    vm.frame_count += 1;
+    var frame = vm.frames[vm.frame_count];
+    frame.function = function;
+    frame.ip = function.chunk.code.?;
+    frame.slots = vm.stack_top - arg_count - 1;
+    return true;
+}
+
+pub fn callValue(vm: *VM, callee: Value, arg_count: u8) bool {
+    switch (callee) {
+        .val_object => |obj| {
+            switch (obj.type) {
+                .function => return vm.call(object.asFunction(obj), arg_count),
+                else => {},
+            }
+        },
+        else => {},
+    }
+    vm.runtimeError("Can only call functions and classes.", .{});
+    return false;
+}
+
 pub fn isFalsy(value: Value) bool {
     return switch (value) {
         .val_nil => true,
@@ -224,6 +247,13 @@ pub fn run(vm: *VM) InterpretResult {
                 const offset = frame.readShort();
                 frame.ip -= offset;
             },
+            .call => {
+                const arg_count = frame.readByte();
+                if (!vm.callValue(vm.peek(arg_count), arg_count)) {
+                    return .interpret_runtime_error;
+                }
+                frame = &vm.frames[vm.frame_count - 1];
+            },
             .@"return" => {
                 return .interpret_ok;
             },
@@ -232,17 +262,9 @@ pub fn run(vm: *VM) InterpretResult {
 }
 
 pub fn interpret(vm: *VM, source: []const u8) InterpretResult {
-    const function = compiler.compile(vm, source);
-    if (function == null) return .interpret_compile_error;
-
-    vm.push(.{ .val_object = &function.?.obj });
-
-    const frame = &vm.frames[vm.frame_count];
-    vm.frame_count += 1;
-    frame.function = function.?;
-    frame.ip = function.?.chunk.code.?;
-    frame.slots = &vm.stack;
-
+    const function = compiler.compile(vm, source) orelse return .interpret_compile_error;
+    vm.push(.{ .val_object = &function.obj });
+    _ = vm.call(function, 0);
     return vm.run();
 }
 

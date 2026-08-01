@@ -50,6 +50,7 @@ pub fn disassembleInstruction(chunk: *const Chunk, offset: usize) usize {
         .jump => return jumpInstruction("OP_JUMP", 1, chunk, offset),
         .jump_if_false => return jumpInstruction("OP_JUMP_IF_FALSE", 1, chunk, offset),
         .loop => return jumpInstruction("OP_LOOP", -1, chunk, offset),
+        .call => return byteInstruction("OP_CALL", chunk, offset),
         .@"return" => return simpleInstruction("OP_RETURN", offset),
     }
 }

@@ -552,9 +552,15 @@ const Compiler = struct {
         }
     }
 
+    fn call(compiler: *Compiler, can_assign: bool) void {
+        _ = can_assign;
+        const arg_count = compiler.argumentList();
+        compiler.emitBytes(@intFromEnum(Chunk.OpCode.call), arg_count);
+    }
+
     fn getRule(token_type: TokenType) ParseRule {
         return switch (token_type) {
-            .left_paren => .{ .prefix = grouping, .infix = null, .precedence = .none },
+            .left_paren => .{ .prefix = grouping, .infix = call, .precedence = .call },
             .right_paren => .{ .prefix = null, .infix = null, .precedence = .none },
             .left_brace => .{ .prefix = null, .infix = null, .precedence = .none },
             .right_brace => .{ .prefix = null, .infix = null, .precedence = .none },
@@ -683,6 +689,25 @@ const Compiler = struct {
             return;
         }
         compiler.emitBytes(@intFromEnum(Chunk.OpCode.define_global), global);
+    }
+
+    fn argumentList(compiler: *Compiler) u8 {
+        var arg_count: u8 = 0;
+        if (!compiler.parser.check(.right_paren)) {
+            while (true) {
+                compiler.expression();
+                if (arg_count == 255) {
+                    compiler.parser.errorAtPrevious("Can't have more than 255 arguments.");
+                }
+                arg_count += 1;
+
+                if (!compiler.parser.match(.comma)) {
+                    break;
+                }
+            }
+        }
+        compiler.parser.consume(.right_paren, "Expect ')' after arguments");
+        return arg_count;
     }
 };
 
