@@ -381,6 +381,7 @@ const Compiler = struct {
     }
 
     fn emitReturn(compiler: *Compiler) void {
+        compiler.emitByte(@intFromEnum(Chunk.OpCode.nil));
         compiler.emitByte(@intFromEnum(Chunk.OpCode.@"return"));
     }
 

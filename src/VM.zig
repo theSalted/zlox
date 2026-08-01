@@ -265,7 +265,16 @@ pub fn run(vm: *VM) InterpretResult {
                 frame = &vm.frames[vm.frame_count - 1];
             },
             .@"return" => {
-                return .interpret_ok;
+                const result = vm.pop();
+                vm.frame_count -= 1;
+                if (vm.frame_count == 0) {
+                    _ = vm.pop();
+                    return .interpret_ok;
+                }
+
+                vm.stack_top = frame.slots;
+                vm.push(result);
+                frame = &vm.frames[vm.frame_count - 1];
             },
         }
     }
