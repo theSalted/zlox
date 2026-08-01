@@ -152,6 +152,26 @@ const Compiler = struct {
         compiler.parsePrecedence(.assignment);
     }
 
+    fn statement(compiler: *Compiler) void {
+        if (compiler.parser.match(.print)) {
+            compiler.printStatement();
+        } else if (compiler.parser.match(.@"for")) {
+            compiler.forStatement();
+        } else if (compiler.parser.match(.@"if")) {
+            compiler.ifStatement();
+        } else if (compiler.parser.match(.@"return")) {
+            compiler.returnStatement();
+        } else if (compiler.parser.match(.@"while")) {
+            compiler.whileStatement();
+        } else if (compiler.parser.match(.left_brace)) {
+            compiler.beginScope();
+            compiler.block();
+            compiler.endScope();
+        } else {
+            compiler.expressionStatement();
+        }
+    }
+
     fn block(compiler: *Compiler) void {
         const parser = compiler.parser;
         while (!parser.check(.right_brace) and !parser.check(.eof)) {
@@ -293,6 +313,20 @@ const Compiler = struct {
         compiler.emitByte(@intFromEnum(Chunk.OpCode.print));
     }
 
+    fn returnStatement(compiler: *Compiler) void {
+        if (compiler.type == .script) {
+            compiler.parser.errorAtPrevious("Can't return from top-level code.");
+        }
+
+        if (compiler.parser.match(.semicolon)) {
+            compiler.emitReturn();
+        } else {
+            compiler.expression();
+            compiler.parser.consume(.semicolon, "Expect ';' after return value.");
+            compiler.emitByte(@intFromEnum(Chunk.OpCode.@"return"));
+        }
+    }
+
     fn whileStatement(compiler: *Compiler) void {
         const loopStart = compiler.currentChunk().count;
         compiler.parser.consume(.left_paren, "Expect '(' after 'while'.");
@@ -334,24 +368,6 @@ const Compiler = struct {
         }
 
         if (compiler.parser.panic_mode) compiler.synchronize();
-    }
-
-    fn statement(compiler: *Compiler) void {
-        if (compiler.parser.match(.print)) {
-            compiler.printStatement();
-        } else if (compiler.parser.match(.@"for")) {
-            compiler.forStatement();
-        } else if (compiler.parser.match(.@"if")) {
-            compiler.ifStatement();
-        } else if (compiler.parser.match(.@"while")) {
-            compiler.whileStatement();
-        } else if (compiler.parser.match(.left_brace)) {
-            compiler.beginScope();
-            compiler.block();
-            compiler.endScope();
-        } else {
-            compiler.expressionStatement();
-        }
     }
 
     fn emitByte(compiler: *Compiler, byte: u8) void {
