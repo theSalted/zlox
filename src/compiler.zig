@@ -168,7 +168,7 @@ const Compiler = struct {
     fn endScope(compiler: *Compiler) void {
         compiler.scope_depth -= 1;
 
-        while (compiler.local_count > 0 and compiler.locals[compiler.local_count - 1].depth >= compiler.scope_depth) {
+        while (compiler.local_count > 0 and compiler.locals[compiler.local_count - 1].depth > compiler.scope_depth) {
             compiler.emitByte(@intFromEnum(Chunk.OpCode.pop));
             compiler.local_count -= 1;
         }
