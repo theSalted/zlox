@@ -85,6 +85,16 @@ pub fn peek(vm: *VM, distance: usize) Value {
 }
 
 pub fn call(vm: *VM, function: *ObjectFunction, arg_count: u8) bool {
+    if (arg_count != function.arity) {
+        vm.runtimeError("Expected {d} arguments but got {d}.", .{ function.arity, arg_count });
+        return false;
+    }
+
+    if (vm.frame_count == frames_max) {
+        vm.runtimeError("Stack overflow", .{});
+        return false;
+    }
+
     vm.frame_count += 1;
     var frame = vm.frames[vm.frame_count];
     frame.function = function;
