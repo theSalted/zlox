@@ -96,7 +96,7 @@ pub fn call(vm: *VM, function: *ObjectFunction, arg_count: u8) bool {
     }
 
     vm.frame_count += 1;
-    var frame = vm.frames[vm.frame_count];
+    const frame = &vm.frames[vm.frame_count - 1];
     frame.function = function;
     frame.ip = function.chunk.code.?;
     frame.slots = vm.stack_top - arg_count - 1;
@@ -306,11 +306,19 @@ fn resetStack(vm: *VM) void {
 fn runtimeError(vm: *VM, comptime fmt: []const u8, args: anytype) void {
     std.debug.print(fmt ++ "\n", args);
 
-    const frame = &vm.frames[vm.frame_count];
-    vm.frame_count -= 1;
-    const instruction = @intFromPtr(frame.ip) - @intFromPtr(frame.function.chunk.code.?) - 1;
-    const line = frame.function.chunk.lines.?[instruction];
-    std.debug.print("[line {d}] in script\n", .{line});
+    for (0..vm.frame_count) |index| {
+        const frame = vm.frames[vm.frame_count - 1 - index];
+        const function = frame.function;
+        const instruction = frame.ip - function.chunk.code.? - 1;
+
+        const line = function.chunk.lines.?[instruction];
+        std.debug.print("[line {d}] in ", .{line});
+        if (function.name == null) {
+            std.debug.print("script\n", .{});
+        } else {
+            std.debug.print("{s}()\n", .{function.name.?.chars[0..function.name.?.len]});
+        }
+    }
 
     vm.resetStack();
 }
