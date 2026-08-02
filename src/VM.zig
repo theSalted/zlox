@@ -6,10 +6,13 @@ const compiler = @import("compiler.zig");
 const object = @import("object.zig");
 const memory = @import("memory.zig");
 
+const Io = std.Io;
+const Clock = Io.Clock;
 const Value = val.Value;
 const Chunk = @import("Chunk.zig");
 const Table = @import("Table.zig").Table;
 const ObjectFunction = object.ObjectFunction;
+const NativeFn = object.NativeFn;
 
 const print = std.debug.print;
 
@@ -55,13 +58,17 @@ globals: Table,
 strings: Table,
 objects: ?*object.Object,
 allocator: std.mem.Allocator,
+io: Io,
 
-pub fn init(vm: *VM, allocator: std.mem.Allocator) void {
+pub fn init(vm: *VM, allocator: std.mem.Allocator, io: Io) void {
     vm.allocator = allocator;
     vm.objects = null;
     vm.resetStack();
     vm.globals.init(allocator);
     vm.strings.init(allocator);
+    vm.io = io;
+
+    vm.defineNative("clock", clockNative);
 }
 
 pub fn free(vm: *VM) void {
@@ -108,6 +115,13 @@ pub fn callValue(vm: *VM, callee: Value, arg_count: u8) bool {
         .val_object => |obj| {
             switch (obj.type) {
                 .function => return vm.call(object.asFunction(obj), arg_count),
+                .native => {
+                    const native = object.asNative(obj).function;
+                    const result = native(vm, arg_count, vm.stack_top - arg_count);
+                    vm.stack_top -= arg_count + 1;
+                    vm.push(result);
+                    return true;
+                },
                 else => {},
             }
         },
@@ -343,4 +357,19 @@ fn concatenate(vm: *VM) void {
 
     const result = object.takeString(vm, chars.ptr, length);
     vm.push(.{ .val_object = &result.obj });
+}
+
+fn defineNative(vm: *VM, name: []const u8, function: NativeFn) void {
+    vm.push(.{ .val_object = &object.copyString(vm, name.ptr, name.len).obj });
+    vm.push(.{ .val_object = &object.newNative(vm, function).obj });
+    _ = vm.globals.set(object.asString(vm.peek(1)), vm.peek(0));
+    _ = vm.pop();
+    _ = vm.pop();
+}
+
+fn clockNative(vm: *VM, arg_count: u8, args: [*]Value) Value {
+    _ = arg_count;
+    _ = args;
+    const ts = Clock.Timestamp.now(vm.io, .real);
+    return .{ .val_number = @as(f64, @floatFromInt(ts.raw.nanoseconds)) / 1_000_000_000.0 };
 }

@@ -4,6 +4,7 @@ const object = @import("object.zig");
 const VM = @import("VM.zig").VM;
 const Object = object.Object;
 const ObjectString = object.ObjectString;
+const ObjectNative = object.ObjectNative;
 const ObjectFunction = object.ObjectFunction;
 
 pub fn growCapacity(capacity: usize) usize {
@@ -30,6 +31,10 @@ pub fn freeObject(vm: *VM, obj: *Object) void {
             const string: *ObjectString = @ptrCast(@alignCast(obj));
             freeArray(u8, vm.allocator, string.chars, string.len);
             vm.allocator.destroy(string);
+        },
+        .native => {
+            const native: *ObjectNative = @ptrCast(@alignCast(obj));
+            vm.allocator.destroy(native);
         },
         .function => {
             const function: *ObjectFunction = @ptrCast(@alignCast(obj));

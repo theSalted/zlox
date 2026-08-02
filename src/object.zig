@@ -7,7 +7,7 @@ const Value = @import("value.zig").Value;
 const VM = @import("VM.zig").VM;
 const Chunk = @import("Chunk.zig");
 
-pub const ObjectType = enum(u8) { string, function };
+pub const ObjectType = enum(u8) { string, native, function };
 
 pub const Object = extern struct {
     type: ObjectType,
@@ -19,6 +19,13 @@ pub const ObjectFunction = struct {
     arity: usize,
     chunk: Chunk,
     name: ?*ObjectString,
+};
+
+pub const NativeFn = *const fn (vm: *VM, arg_count: u8, args: [*]Value) Value;
+
+pub const ObjectNative = struct {
+    obj: Object,
+    function: NativeFn,
 };
 
 pub const ObjectString = extern struct {
@@ -53,6 +60,12 @@ pub fn newFunction(vm: *VM) *ObjectFunction {
     function.name = null;
     function.chunk.init(vm.allocator);
     return function;
+}
+
+pub fn newNative(vm: *VM, function: NativeFn) *ObjectNative {
+    const native = allocateObject(vm, ObjectNative, .native);
+    native.function = function;
+    return native;
 }
 
 fn allocateString(vm: *VM, chars: [*]const u8, len: usize, hash: u32) *ObjectString {
@@ -98,6 +111,9 @@ pub fn printObject(obj: *Object) void {
             const string: *ObjectString = @ptrCast(@alignCast(obj));
             print("{s}", .{string.chars[0..string.len]});
         },
+        .native => {
+            print("<native fn>", .{});
+        },
         .function => {
             const function: *ObjectFunction = @ptrCast(@alignCast(obj));
             if (function.name == null) {
@@ -114,5 +130,9 @@ pub inline fn isObjType(value: Value, object_type: ObjectType) bool {
 }
 
 pub inline fn asFunction(obj: *Object) *ObjectFunction {
+    return @ptrCast(@alignCast(obj));
+}
+
+pub inline fn asNative(obj: *Object) *ObjectNative {
     return @ptrCast(@alignCast(obj));
 }
